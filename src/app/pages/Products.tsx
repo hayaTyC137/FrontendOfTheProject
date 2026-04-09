@@ -1,7 +1,7 @@
 import { forwardRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShoppingCart, Star, TrendingUp, Zap } from "lucide-react";
-import { games } from "./GameSelector";
+import { games } from "../components/GameSelector";
 
 const allPackages: Record<
   string,
