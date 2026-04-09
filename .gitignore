@@ -1,4 +1,31 @@
+# Dependencies
 node_modules/
-.env
+
+# Build
 dist/
 build/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Vite
+*.local
+
+# Editor
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*

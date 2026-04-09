@@ -1,13 +1,16 @@
 import { useRef, useState, useCallback } from "react";
-import { Navbar } from "./components/Navbar";
-import { Hero } from "./components/Hero";
-import { GameSelector } from "./components/GameSelector";
-import { Products } from "./components/Products";
-import { Stats } from "./components/Stats";
-import { Reviews } from "./components/Reviews";
-import { Footer } from "./components/Footer";
+import { Routes, Route } from "react-router";
+import { Navbar } from "./app/components/layout/Navbar";
+import { Hero } from "./app/pages/Hero";
+import { GameSelector } from "./app/pages/GameSelector";
+import { Products } from "./app/pages/Products";
+import { Stats } from "./app/pages/Stats";
+import { Reviews } from "./app/pages/Reviews";
+import { Footer } from "./app/components/layout/Footer";
+import { Login } from "./app/pages/login";
+import { Register } from "./app/pages/register";
 
-export default function App() {
+function Home() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [cartCount, setCartCount] = useState(0);
 
@@ -16,7 +19,6 @@ export default function App() {
 
   const handleSelectGame = useCallback((gameId: string) => {
     setSelectedGame(gameId);
-    // Scroll to products
     setTimeout(() => {
       productsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
@@ -39,30 +41,23 @@ export default function App() {
         overflowX: "hidden",
       }}
     >
-      <Navbar
-        onSelectGame={handleSelectGame}
-        cartCount={cartCount}
-      />
-
+      <Navbar onSelectGame={handleSelectGame} cartCount={cartCount} />
       <Hero onCTA={handleCTA} />
-
       <Stats />
-
-      <GameSelector
-        ref={gameSectionRef}
-        selectedGame={selectedGame}
-        onSelect={handleSelectGame}
-      />
-
-      <Products
-        ref={productsSectionRef}
-        selectedGame={selectedGame}
-        onAddToCart={handleAddToCart}
-      />
-
+      <GameSelector ref={gameSectionRef} selectedGame={selectedGame} onSelect={handleSelectGame} />
+      <Products ref={productsSectionRef} selectedGame={selectedGame} onAddToCart={handleAddToCart} />
       <Reviews />
-
       <Footer />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+    </Routes>
   );
 }
