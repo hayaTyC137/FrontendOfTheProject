@@ -1,54 +1,8 @@
 import { forwardRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShoppingCart, Star, TrendingUp, Zap } from "lucide-react";
-import { games } from "../components/GameSelector";
-
-const allPackages: Record<
-  string,
-  {
-    id: string;
-    amount: number;
-    label: string;
-    price: number;
-    oldPrice?: number;
-    bonus?: string;
-    badge?: string;
-    popular?: boolean;
-  }[]
-> = {
-  valorant: [
-    { id: "vp1", amount: 475, label: "475 VP", price: 4.99 },
-    { id: "vp2", amount: 1000, label: "1 000 VP", price: 9.99, oldPrice: 11.99, bonus: "+50 VP бонус" },
-    { id: "vp3", amount: 2050, label: "2 050 VP", price: 19.99, badge: "Выгодно", popular: true },
-    { id: "vp4", amount: 4100, label: "4 100 VP", price: 34.99, oldPrice: 39.99, bonus: "+200 VP бонус" },
-    { id: "vp5", amount: 8700, label: "8 700 VP", price: 69.99, bonus: "+700 VP бонус", badge: "Максимум" },
-    { id: "vp6", amount: 11000, label: "11 000 VP", price: 79.99, oldPrice: 99.99, bonus: "+1000 VP бонус" },
-  ],
-  clashroyale: [
-    { id: "gem1", amount: 80, label: "80 Gems", price: 0.99 },
-    { id: "gem2", amount: 500, label: "500 Gems", price: 4.99 },
-    { id: "gem3", amount: 1200, label: "1 200 Gems", price: 9.99, popular: true, badge: "Хит" },
-    { id: "gem4", amount: 2500, label: "2 500 Gems", price: 19.99, oldPrice: 24.99, bonus: "+200 Gems бонус" },
-    { id: "gem5", amount: 6500, label: "6 500 Gems", price: 49.99, badge: "Выгодно" },
-    { id: "gem6", amount: 14000, label: "14 000 Gems", price: 99.99, oldPrice: 129.99, bonus: "+2000 Gems" },
-  ],
-  fortnite: [
-    { id: "vb1", amount: 1000, label: "1 000 V-Bucks", price: 7.99 },
-    { id: "vb2", amount: 2800, label: "2 800 V-Bucks", price: 19.99, popular: true, badge: "Популярно" },
-    { id: "vb3", amount: 5000, label: "5 000 V-Bucks", price: 31.99, oldPrice: 39.99, bonus: "+300 V-Bucks" },
-    { id: "vb4", amount: 7500, label: "7 500 V-Bucks", price: 47.99, badge: "Выгодно" },
-    { id: "vb5", amount: 13500, label: "13 500 V-Bucks", price: 79.99, bonus: "+1500 V-Bucks", oldPrice: 99.99 },
-    { id: "vb6", amount: 40000, label: "40 000 V-Bucks", price: 199.99, badge: "Максимум" },
-  ],
-  apex: [
-    { id: "ac1", amount: 1000, label: "1 000 Coins", price: 9.99 },
-    { id: "ac2", amount: 2150, label: "2 150 Coins", price: 19.99, popular: true, badge: "Хит" },
-    { id: "ac3", amount: 4350, label: "4 350 Coins", price: 39.99, oldPrice: 49.99, bonus: "+150 Coins" },
-    { id: "ac4", amount: 6700, label: "6 700 Coins", price: 59.99, badge: "Выгодно" },
-    { id: "ac5", amount: 11500, label: "11 500 Coins", price: 99.99, bonus: "+500 Coins" },
-    { id: "ac6", amount: 20000, label: "20 000 Coins", price: 159.99, oldPrice: 199.99, badge: "Максимум" },
-  ],
-};
+import { useNavigate } from "react-router";
+import { games, getPackagesByGame } from "../../data/packages";
 
 interface ProductsProps {
   selectedGame: string | null;
@@ -58,9 +12,10 @@ interface ProductsProps {
 export const Products = forwardRef<HTMLElement, ProductsProps>(
   function Products({ selectedGame, onAddToCart }, ref) {
     const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+    const navigate = useNavigate();
 
     const game = games.find((g) => g.id === selectedGame);
-    const packages = selectedGame ? allPackages[selectedGame] : null;
+    const packages = selectedGame ? getPackagesByGame(selectedGame) : null;
 
     function handleAdd(id: string) {
       setAddedIds((prev) => new Set([...prev, id]));
@@ -177,7 +132,8 @@ export const Products = forwardRef<HTMLElement, ProductsProps>(
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.06 }}
-                        className="group relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
+                        onClick={() => navigate(`/product/${pkg.id}`)}
+                        className="group relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden cursor-pointer"
                         style={{
                           background: pkg.popular
                             ? `${game!.colorDim}`
@@ -289,7 +245,10 @@ export const Products = forwardRef<HTMLElement, ProductsProps>(
                           </div>
 
                           <motion.button
-                            onClick={() => handleAdd(pkg.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAdd(pkg.id);
+                            }}
                             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white transition-all"
                             style={{
                               fontFamily: "Inter, sans-serif",
