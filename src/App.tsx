@@ -9,6 +9,7 @@ import { Reviews } from "./app/pages/Reviews";
 import { Footer } from "./app/components/layout/Footer";
 import { Login } from "./app/pages/login";
 import { Register } from "./app/pages/register";
+import { ProductPage } from "./app/pages/ProductPage";
 
 function Home() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
@@ -58,6 +59,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/product/:id" element={<ProductPage />} />
     </Routes>
   );
 }

@@ -1,56 +1,12 @@
 import { useState, forwardRef } from "react";
 import { motion } from "motion/react";
+import { games } from "../../data/packages";
+import { renderGameMark } from "../utils/renderGameMark";
 
-export const games = [
-  {
-    id: "valorant",
-    name: "Valorant",
-    currency: "Valorant Points",
-    abbr: "VP",
-    color: "#FF8A8A",
-    colorDim: "rgba(255,138,138,0.12)",
-    colorGlow: "rgba(255,138,138,0.25)",
-    emoji: "⚡",
-    description: "Боевые пасы, скины, агенты",
-    tag: "Популярно",
-  },
-  {
-    id: "clashroyale",
-    name: "Clash Royale",
-    currency: "Gems",
-    abbr: "GEM",
-    color: "#7ABAFF",
-    colorDim: "rgba(122,186,255,0.12)",
-    colorGlow: "rgba(122,186,255,0.25)",
-    emoji: "💎",
-    description: "Карточки, сундуки, пасы",
-    tag: "Топ продаж",
-  },
-  {
-    id: "fortnite",
-    name: "Fortnite",
-    currency: "V-Bucks",
-    abbr: "VB",
-    color: "#B47AFF",
-    colorDim: "rgba(180,122,255,0.12)",
-    colorGlow: "rgba(180,122,255,0.25)",
-    emoji: "🎮",
-    description: "Скины, эмоции, боевой пропуск",
-    tag: "Хит",
-  },
-  {
-    id: "apex",
-    name: "Apex Legends",
-    currency: "Apex Coins",
-    abbr: "AC",
-    color: "#FFB07A",
-    colorDim: "rgba(255,176,122,0.12)",
-    colorGlow: "rgba(255,176,122,0.25)",
-    emoji: "🔥",
-    description: "Скины, боевые пасы, бандлы",
-    tag: "Новинки",
-  },
-];
+interface GameSelectorProps {
+  selectedGame: string | null;
+  onSelect: (gameId: string) => void;
+}
 
 interface GameSelectorProps {
   selectedGame: string | null;
@@ -172,7 +128,7 @@ export const GameSelector = forwardRef<HTMLElement, GameSelectorProps>(
                       className="text-2xl"
                       style={{ filter: `drop-shadow(0 0 8px ${game.color}60)` }}
                     >
-                      {game.emoji}
+                      {renderGameMark({ icon: game.icon, name: game.name, emoji: game.emoji, className: "w-12 h-12" })}
                     </span>
                     <span
                       className="px-2.5 py-1 rounded-full text-[10px]"
