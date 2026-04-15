@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShoppingCart, User, ChevronDown, Zap, X, Search } from "lucide-react";
+import { useNavigate } from "react-router";
+import { useAuth } from "../../context/AuthContext";
 
 const games = [
   { id: "valorant", name: "Valorant", color: "#FF8A8A", currency: "Valorant Points" },
@@ -17,9 +19,13 @@ interface NavbarProps {
 export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { isAuthenticated, signOut } = useAuth();
 
   const filteredGames = searchQuery.trim()
     ? games.filter((game) => {
@@ -42,10 +48,28 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
       }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileMenuOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  function handleProfileAction() {
+    setProfileMenuOpen(false);
+    if (isAuthenticated) {
+      navigate("/dashboard");
+      return;
+    }
+    navigate("/login");
+  }
+
+  function handleLogoutAction() {
+    setProfileMenuOpen(false);
+    signOut();
+    navigate("/");
+  }
 
   return (
     <nav
@@ -265,14 +289,76 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
         </motion.button>
 
         {/* Profile */}
-        <motion.button
-          className="w-10 h-10 rounded-xl flex items-center justify-center text-white/60 hover:text-white transition-colors"
-          style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)" }}
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.93 }}
-        >
-          <User size={18} />
-        </motion.button>
+        <div className="relative" ref={profileMenuRef}>
+          <motion.button
+            onClick={() => setProfileMenuOpen((v) => !v)}
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-white/60 hover:text-white transition-colors"
+            style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)" }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.93 }}
+          >
+            <User size={18} />
+          </motion.button>
+
+          <AnimatePresence>
+            {profileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="absolute right-0 mt-2 w-44 rounded-xl overflow-hidden"
+                style={{
+                  background: "rgba(14, 14, 22, 0.98)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                }}
+              >
+                {isAuthenticated ? (
+                  <>
+                    <button
+                      onClick={handleProfileAction}
+                      className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:text-white"
+                      style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}
+                    >
+                      Профиль
+                    </button>
+                    <button
+                      onClick={handleLogoutAction}
+                      className="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:text-white"
+                      style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}
+                    >
+                      Выйти
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        navigate("/login");
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-white/80 hover:text-white"
+                      style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}
+                    >
+                      Войти
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        navigate("/register");
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-white/70 hover:text-white"
+                      style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}
+                    >
+                      Регистрация
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Cart Modal */}

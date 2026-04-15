@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router";
 import { Mail, Lock, User, Zap, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 interface RegisterProps {
   onNavigateLogin?: () => void;
@@ -25,10 +26,15 @@ function getPasswordStrength(password: string): { score: number; label: string; 
 export function Register({ onNavigateLogin }: RegisterProps) {
   const navigate = useNavigate();
   const goToLogin = onNavigateLogin ?? (() => navigate("/login"));
+  const { signUp, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [agreed, setAgreed] = useState(false);
+  const [error, setError] = useState("");
 
   const [nickFocused, setNickFocused] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
@@ -36,6 +42,35 @@ export function Register({ onNavigateLogin }: RegisterProps) {
   const [confirmFocused, setConfirmFocused] = useState(false);
 
   const strength = getPasswordStrength(password);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (!agreed) {
+      setError("Подтвердите согласие с условиями использования");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Пароли не совпадают");
+      return;
+    }
+
+    const result = signUp({ username: nickname, email, password });
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setError("");
+    navigate("/dashboard");
+  }
 
   return (
     <div
@@ -105,8 +140,9 @@ export function Register({ onNavigateLogin }: RegisterProps) {
           </p>
         </div>
 
-        {/* Fields */}
-        <div className="flex flex-col gap-3 mb-4">
+        <form onSubmit={handleSubmit}>
+          {/* Fields */}
+          <div className="flex flex-col gap-3 mb-4">
           {/* Nickname */}
           <div className="relative">
             <User
@@ -117,6 +153,8 @@ export function Register({ onNavigateLogin }: RegisterProps) {
             <input
               type="text"
               placeholder="Никнейм"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
               onFocus={() => setNickFocused(true)}
               onBlur={() => setNickFocused(false)}
               className="w-full pl-10 pr-4 py-3 rounded-xl text-white text-sm outline-none transition-all duration-200"
@@ -139,6 +177,8 @@ export function Register({ onNavigateLogin }: RegisterProps) {
             <input
               type="email"
               placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
               className="w-full pl-10 pr-4 py-3 rounded-xl text-white text-sm outline-none transition-all duration-200"
@@ -223,6 +263,8 @@ export function Register({ onNavigateLogin }: RegisterProps) {
             <input
               type={showConfirm ? "text" : "password"}
               placeholder="Подтверждение пароля"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               onFocus={() => setConfirmFocused(true)}
               onBlur={() => setConfirmFocused(false)}
               className="w-full pl-10 pr-11 py-3 rounded-xl text-white text-sm outline-none transition-all duration-200"
@@ -243,10 +285,10 @@ export function Register({ onNavigateLogin }: RegisterProps) {
               {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
-        </div>
+          </div>
 
-        {/* Checkbox */}
-        <div className="flex items-start gap-3 mb-6">
+          {/* Checkbox */}
+          <div className="flex items-start gap-3 mb-6">
           <button
             type="button"
             onClick={() => setAgreed((v) => !v)}
@@ -275,28 +317,36 @@ export function Register({ onNavigateLogin }: RegisterProps) {
               политику конфиденциальности
             </button>
           </span>
-        </div>
+          </div>
 
-        {/* Submit */}
-        <motion.button
-          className="w-full py-3.5 rounded-xl text-white text-sm mb-5"
-          style={{
-            fontWeight: 700,
-            background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
-            boxShadow: "0 0 28px rgba(180,122,255,0.35), 0 4px 20px rgba(0,0,0,0.3)",
-            fontFamily: "Inter, sans-serif",
-            opacity: agreed ? 1 : 0.5,
-            cursor: agreed ? "pointer" : "not-allowed",
-          }}
-          whileHover={agreed ? {
-            scale: 1.02,
-            boxShadow: "0 0 40px rgba(180,122,255,0.55), 0 4px 24px rgba(0,0,0,0.4)",
-          } : {}}
-          whileTap={agreed ? { scale: 0.97 } : {}}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        >
-          Зарегистрироваться
-        </motion.button>
+          {error && (
+            <p className="text-sm mb-4" style={{ color: "#FF8A8A", fontWeight: 500 }}>
+              {error}
+            </p>
+          )}
+
+          {/* Submit */}
+          <motion.button
+            type="submit"
+            className="w-full py-3.5 rounded-xl text-white text-sm mb-5"
+            style={{
+              fontWeight: 700,
+              background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
+              boxShadow: "0 0 28px rgba(180,122,255,0.35), 0 4px 20px rgba(0,0,0,0.3)",
+              fontFamily: "Inter, sans-serif",
+              opacity: agreed ? 1 : 0.5,
+              cursor: agreed ? "pointer" : "not-allowed",
+            }}
+            whileHover={agreed ? {
+              scale: 1.02,
+              boxShadow: "0 0 40px rgba(180,122,255,0.55), 0 4px 24px rgba(0,0,0,0.4)",
+            } : {}}
+            whileTap={agreed ? { scale: 0.97 } : {}}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            Зарегистрироваться
+          </motion.button>
+        </form>
 
         {/* Login link */}
         <p className="text-center text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>

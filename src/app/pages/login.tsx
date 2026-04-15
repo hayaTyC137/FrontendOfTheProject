@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router";
 import { Mail, Lock, Zap, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 interface LoginProps {
   onNavigateRegister?: () => void;
@@ -10,9 +11,31 @@ interface LoginProps {
 export function Login({ onNavigateRegister }: LoginProps) {
   const navigate = useNavigate();
   const goToRegister = onNavigateRegister ?? (() => navigate("/register"));
+  const { signIn, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const result = signIn(identifier, password);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setError("");
+    navigate("/dashboard");
+  }
 
   return (
     <div
@@ -88,8 +111,9 @@ export function Login({ onNavigateRegister }: LoginProps) {
           </p>
         </div>
 
-        {/* Fields */}
-        <div className="flex flex-col gap-3 mb-5">
+        <form onSubmit={handleSubmit}>
+          {/* Fields */}
+          <div className="flex flex-col gap-3 mb-5">
           {/* Email */}
           <div className="relative">
             <Mail
@@ -100,6 +124,8 @@ export function Login({ onNavigateRegister }: LoginProps) {
             <input
               type="text"
               placeholder="Email или никнейм"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               onFocus={() => setEmailFocused(true)}
               onBlur={() => setEmailFocused(false)}
               className="w-full pl-10 pr-4 py-3 rounded-xl text-white text-sm outline-none transition-all duration-200"
@@ -124,6 +150,8 @@ export function Login({ onNavigateRegister }: LoginProps) {
             <input
               type={showPassword ? "text" : "password"}
               placeholder="Пароль"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
               className="w-full pl-10 pr-11 py-3 rounded-xl text-white text-sm outline-none transition-all duration-200"
@@ -146,7 +174,13 @@ export function Login({ onNavigateRegister }: LoginProps) {
               {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
-        </div>
+          </div>
+
+          {error && (
+            <p className="text-sm mb-4" style={{ color: "#FF8A8A", fontWeight: 500 }}>
+              {error}
+            </p>
+          )}
 
         {/* Forgot password */}
         <div className="flex justify-end mb-6">
@@ -158,24 +192,26 @@ export function Login({ onNavigateRegister }: LoginProps) {
           </button>
         </div>
 
-        {/* Submit */}
-        <motion.button
-          className="w-full py-3.5 rounded-xl text-white text-sm mb-5"
-          style={{
-            fontWeight: 700,
-            background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
-            boxShadow: "0 0 28px rgba(180,122,255,0.35), 0 4px 20px rgba(0,0,0,0.3)",
-            fontFamily: "Inter, sans-serif",
-          }}
-          whileHover={{
-            scale: 1.02,
-            boxShadow: "0 0 40px rgba(180,122,255,0.55), 0 4px 24px rgba(0,0,0,0.4)",
-          }}
-          whileTap={{ scale: 0.97 }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        >
-          Войти
-        </motion.button>
+          {/* Submit */}
+          <motion.button
+            type="submit"
+            className="w-full py-3.5 rounded-xl text-white text-sm mb-5"
+            style={{
+              fontWeight: 700,
+              background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
+              boxShadow: "0 0 28px rgba(180,122,255,0.35), 0 4px 20px rgba(0,0,0,0.3)",
+              fontFamily: "Inter, sans-serif",
+            }}
+            whileHover={{
+              scale: 1.02,
+              boxShadow: "0 0 40px rgba(180,122,255,0.55), 0 4px 24px rgba(0,0,0,0.4)",
+            }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            Войти
+          </motion.button>
+        </form>
 
         {/* Divider */}
         <div className="flex items-center gap-3 mb-5">
