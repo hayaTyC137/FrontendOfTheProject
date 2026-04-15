@@ -9,6 +9,7 @@ export function ProductPage() {
   const navigate = useNavigate();
 
   const product = getPackageById(id ?? "");
+  
   const game = product ? getGameById(product.gameId) : undefined;
   const similarPackages = product
     ? getPackagesByGame(product.gameId).filter((p) => p.id !== product.id)
@@ -31,7 +32,7 @@ export function ProductPage() {
       </div>
     );
   }
-  
+  const productIconClass = game.productIconClass;
 
   return (
     <div
@@ -60,7 +61,7 @@ export function ProductPage() {
               className="absolute inset-0 flex items-center justify-center text-8xl opacity-10"
               style={{ filter: `drop-shadow(0 0 40px ${game.color})` }}
             >
-              {renderGameMark({ icon: game.icon, name: game.name, emoji: game.emoji, className: "w-12 h-12 rounded-xl" })}
+              {renderGameMark({ icon: game.icon, name: game.name, className: "w-12 h-12 rounded-xl" })}
             </div>
           </div>
         )}
@@ -76,7 +77,7 @@ export function ProductPage() {
         {/* Название игры поверх баннера */}
         <div className="absolute bottom-5 left-8 flex items-center gap-3">
           <span className="text-3xl" style={{ filter: `drop-shadow(0 0 12px ${game.color})` }}>
-            {renderGameMark({ icon: game.icon, name: game.name, emoji: game.emoji, className: "w-12 h-12 rounded-xl" })}
+            {renderGameMark({ icon: game.icon, name: game.name, className: "w-12 h-12 rounded-xl" })}
           </span>
           <div>
             <h2 className="text-white text-xl" style={{ fontWeight: 800, letterSpacing: "-0.02em" }}>
@@ -130,7 +131,7 @@ export function ProductPage() {
                 boxShadow: `0 0 40px ${game.colorGlow}, 0 0 80px ${game.colorGlow}`,
               }}
             >
-              {renderGameMark({ icon: game.icon, name: game.name, emoji: game.emoji, className: "w-25 h-25" })}
+              {renderGameMark({ icon: game.icon, name: game.name, className: productIconClass })}
             </div>
 
             <p className="text-center text-sm" style={{ color: "rgba(255,255,255,0.4)", lineHeight: 1.65 }}>
@@ -314,7 +315,7 @@ export function ProductPage() {
                 border: `1px solid ${game.color}25`,
               }}
             >
-              <span className="text-2xl">{renderGameMark({ icon: game.icon, name: game.name, emoji: game.emoji, className: "w-12 h-12 rounded-xl" })}</span>
+              <span className="text-2xl">{renderGameMark({ icon: game.icon, name: game.name, className: "w-12 h-12 rounded-xl" })}</span>
               <div>
                 <p className="text-white text-sm" style={{ fontWeight: 700 }}>{game.name}</p>
                 <p className="text-xs" style={{ color: game.color, fontWeight: 600 }}>{game.tag}</p>
