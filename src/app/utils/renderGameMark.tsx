@@ -8,10 +8,10 @@ type GameMarkProps = {
   className?: string;
 };
 
-export function renderGameMark({ icon, name, emoji = "🎮", className = "" }: GameMarkProps): ReactNode {
+export function renderGameMark({ icon, name, className = "" }: GameMarkProps): ReactNode {
   if (icon) {
     return <img src={icon} alt={name} className={`${className} object-contain block`} />;
   }
 
-  return <span className={className}>{emoji}</span>;
+  return <span className={className}>{name}</span>;
 }
