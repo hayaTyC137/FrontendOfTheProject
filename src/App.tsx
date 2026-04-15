@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from "react";
-import { Routes, Route } from "react-router";
+import { Routes, Route, Navigate } from "react-router";
 import { Navbar } from "./app/components/layout/Navbar";
 import { Hero } from "./app/pages/Hero";
 import { GameSelector } from "./app/pages/GameSelector";
@@ -10,6 +10,8 @@ import { Footer } from "./app/components/layout/Footer";
 import { Login } from "./app/pages/login";
 import { Register } from "./app/pages/register";
 import { ProductPage } from "./app/pages/ProductPage";
+import Dashboard from "./app/pages/Dashboard";
+import { useAuth } from "./app/context/AuthContext";
 
 function Home() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
@@ -53,6 +55,16 @@ function Home() {
   );
 }
 
+function DashboardRoute() {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Dashboard />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -60,6 +72,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/product/:id" element={<ProductPage />} />
+      <Route path="/dashboard" element={<DashboardRoute />} />
     </Routes>
   );
 }
