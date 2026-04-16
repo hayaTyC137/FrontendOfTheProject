@@ -1,12 +1,16 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { ArrowLeft, ShoppingCart, Zap, Shield, Clock, Star, CheckCircle2 } from "lucide-react";
 import { getPackageById, getPackagesByGame, getGameById } from "../../data/packages";
 import { renderGameMark } from "../utils/renderGameMark";
+import { useCart } from "../context/CartContext";
 
 export function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { addItem } = useCart();
+  const [added, setAdded] = useState(false);
 
   const product = getPackageById(id ?? "");
   
@@ -14,6 +18,19 @@ export function ProductPage() {
   const similarPackages = product
     ? getPackagesByGame(product.gameId).filter((p) => p.id !== product.id)
     : [];
+
+  function handleAddOnly() {
+    if (!product) return;
+    addItem(product);
+    setAdded(true);
+    window.setTimeout(() => setAdded(false), 1800);
+  }
+
+  function handleBuyNow() {
+    if (!product) return;
+    addItem(product);
+    navigate("/cart");
+  }
 
   if (!product || !game) {
     return (
@@ -222,6 +239,7 @@ export function ProductPage() {
 
             <div className="flex flex-col gap-2.5">
               <motion.button
+                onClick={handleBuyNow}
                 className="w-full py-3.5 rounded-xl text-white text-sm"
                 style={{
                   fontWeight: 700,
@@ -236,6 +254,7 @@ export function ProductPage() {
               </motion.button>
 
               <motion.button
+                onClick={handleAddOnly}
                 className="w-full py-3 rounded-xl text-white/70 text-sm flex items-center justify-center gap-2 hover:text-white transition-colors"
                 style={{
                   fontWeight: 600,
@@ -246,7 +265,7 @@ export function ProductPage() {
                 whileTap={{ scale: 0.97 }}
               >
                 <ShoppingCart size={14} />
-                Добавить в корзину
+                {added ? "✓ Добавлено" : "Добавить в корзину"}
               </motion.button>
             </div>
 

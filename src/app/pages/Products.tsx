@@ -2,28 +2,29 @@ import { forwardRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShoppingCart, Star, TrendingUp, Zap } from "lucide-react";
 import { useNavigate } from "react-router";
-import { games, getPackagesByGame } from "../../data/packages";
+import { games, getPackagesByGame, type Package } from "../../data/packages";
+import { useCart } from "../context/CartContext";
 
 interface ProductsProps {
   selectedGame: string | null;
-  onAddToCart: () => void;
 }
 
 export const Products = forwardRef<HTMLElement, ProductsProps>(
-  function Products({ selectedGame, onAddToCart }, ref) {
+  function Products({ selectedGame }, ref) {
     const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
     const navigate = useNavigate();
+    const { addItem } = useCart();
 
     const game = games.find((g) => g.id === selectedGame);
     const packages = selectedGame ? getPackagesByGame(selectedGame) : null;
 
-    function handleAdd(id: string) {
-      setAddedIds((prev) => new Set([...prev, id]));
-      onAddToCart();
+    function handleAdd(pkg: Package) {
+      setAddedIds((prev) => new Set([...prev, pkg.id]));
+      addItem(pkg);
       setTimeout(() => {
         setAddedIds((prev) => {
           const next = new Set(prev);
-          next.delete(id);
+          next.delete(pkg.id);
           return next;
         });
       }, 2000);
@@ -247,7 +248,7 @@ export const Products = forwardRef<HTMLElement, ProductsProps>(
                           <motion.button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleAdd(pkg.id);
+                              handleAdd(pkg);
                             }}
                             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-white transition-all"
                             style={{

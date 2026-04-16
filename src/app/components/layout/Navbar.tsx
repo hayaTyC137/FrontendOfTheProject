@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ShoppingCart, User, ChevronDown, Zap, X, Search } from "lucide-react";
+import { ShoppingCart, User, ChevronDown, Zap, Search } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 
@@ -18,7 +18,6 @@ interface NavbarProps {
 
 export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -269,7 +268,7 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
 
         {/* Cart */}
         <motion.button
-          onClick={() => setCartOpen(true)}
+          onClick={() => navigate("/cart")}
           className="relative w-10 h-10 rounded-xl flex items-center justify-center text-white/60 hover:text-white transition-colors"
           style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)" }}
           whileHover={{ scale: 1.08 }}
@@ -360,46 +359,6 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
           </AnimatePresence>
         </div>
       </div>
-
-      {/* Cart Modal */}
-      <AnimatePresence>
-        {cartOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setCartOpen(false)}
-              className="fixed inset-0 z-[60]"
-              style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
-            />
-            <motion.div
-              initial={{ opacity: 0, x: 60 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 60 }}
-              transition={{ type: "spring", stiffness: 300, damping: 28 }}
-              className="fixed right-0 top-0 bottom-0 w-80 z-[70] flex flex-col"
-              style={{
-                background: "rgba(10,10,18,0.98)",
-                borderLeft: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <div className="flex items-center justify-between p-6 border-b border-white/8">
-                <h2 className="text-white" style={{ fontFamily: "Inter, sans-serif", fontWeight: 700, fontSize: "1.1rem" }}>
-                  Корзина
-                </h2>
-                <button onClick={() => setCartOpen(false)} className="text-white/40 hover:text-white transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-white/30 p-6">
-                <ShoppingCart size={40} className="opacity-30" />
-                <p style={{ fontFamily: "Inter, sans-serif", fontSize: "0.9rem" }}>Корзина пуста</p>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
     </nav>
   );
 }
