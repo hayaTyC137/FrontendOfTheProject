@@ -75,7 +75,7 @@ export const games = [
     productIconClass: "w-30 h-30",
     description: "Скины, боевые пасы, бандлы",
     tag: "Новинки",
-    banner: null,
+    banner: "/images/apex-banner.png",
     about: "Apex Coins — премиальная валюта Apex Legends от EA и Respawn. Открывает доступ к эксклюзивным скинам легенд и оружия.",
     usedFor: [
       "Скины легенд и оружия",

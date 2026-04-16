@@ -10,12 +10,14 @@ import { Footer } from "./app/components/layout/Footer";
 import { Login } from "./app/pages/login";
 import { Register } from "./app/pages/register";
 import { ProductPage } from "./app/pages/ProductPage";
+import { CartPage } from "./app/pages/CartPage";
 import Dashboard from "./app/pages/Dashboard";
 import { useAuth } from "./app/context/AuthContext";
+import { useCart } from "./app/context/CartContext";
 
 function Home() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
-  const [cartCount, setCartCount] = useState(0);
+  const { totalCount } = useCart();
 
   const gameSectionRef = useRef<HTMLElement>(null);
   const productsSectionRef = useRef<HTMLElement>(null);
@@ -31,10 +33,6 @@ function Home() {
     gameSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const handleAddToCart = useCallback(() => {
-    setCartCount((c) => c + 1);
-  }, []);
-
   return (
     <div
       style={{
@@ -44,11 +42,11 @@ function Home() {
         overflowX: "hidden",
       }}
     >
-      <Navbar onSelectGame={handleSelectGame} cartCount={cartCount} />
+      <Navbar onSelectGame={handleSelectGame} cartCount={totalCount} />
       <Hero onCTA={handleCTA} />
       <Stats />
       <GameSelector ref={gameSectionRef} selectedGame={selectedGame} onSelect={handleSelectGame} />
-      <Products ref={productsSectionRef} selectedGame={selectedGame} onAddToCart={handleAddToCart} />
+      <Products ref={productsSectionRef} selectedGame={selectedGame} />
       <Reviews />
       <Footer />
     </div>
@@ -72,6 +70,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/product/:id" element={<ProductPage />} />
+      <Route path="/cart" element={<CartPage />} />
       <Route path="/dashboard" element={<DashboardRoute />} />
     </Routes>
   );

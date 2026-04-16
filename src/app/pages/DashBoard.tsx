@@ -30,6 +30,8 @@ import {
   Ban,
 } from "lucide-react";
 import { useAuth, type AuthUser, type Role } from "../context/AuthContext";
+import { useUserOrders } from "../hooks/useUserOrders.ts";
+import type { OrderRecord } from "../services/ordersStorage.ts";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,7 +51,7 @@ interface UserProfile {
   verified: boolean;
 }
 
-interface Order {
+type Order = {
   id: string;
   game: string;
   gameColor: string;
@@ -58,62 +60,7 @@ interface Order {
   price: number;
   status: "completed" | "pending" | "failed";
   date: string;
-}
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const mockOrders: Order[] = [
-  {
-    id: "#ORD-4821",
-    game: "Fortnite",
-    gameColor: "#B47AFF",
-    item: "2 800 V-Bucks",
-    amount: "2 800 VB",
-    price: 19.99,
-    status: "completed",
-    date: "12 апр 2025",
-  },
-  {
-    id: "#ORD-4790",
-    game: "Valorant",
-    gameColor: "#FF8A8A",
-    item: "2 050 VP",
-    amount: "2 050 VP",
-    price: 19.99,
-    status: "completed",
-    date: "3 апр 2025",
-  },
-  {
-    id: "#ORD-4743",
-    game: "Apex Legends",
-    gameColor: "#FFB07A",
-    item: "2 150 Coins",
-    amount: "2 150 AC",
-    price: 19.99,
-    status: "pending",
-    date: "28 мар 2025",
-  },
-  {
-    id: "#ORD-4700",
-    game: "Clash Royale",
-    gameColor: "#7ABAFF",
-    item: "1 200 Gems",
-    amount: "1 200 GEM",
-    price: 9.99,
-    status: "failed",
-    date: "15 мар 2025",
-  },
-  {
-    id: "#ORD-4601",
-    game: "Fortnite",
-    gameColor: "#B47AFF",
-    item: "1 000 V-Bucks",
-    amount: "1 000 VB",
-    price: 7.99,
-    status: "completed",
-    date: "2 мар 2025",
-  },
-];
+};
 
 const adminUsers = [
   { id: "usr_8271", username: "Egorka_Pro", role: "user", email: "egorka@gmail.com", orders: 14, spent: 342.87, status: "active" },
@@ -327,7 +274,24 @@ function Sidebar({
 
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 
-function OverviewTab({ user }: { user: UserProfile }) {
+function mapOrderRecord(record: OrderRecord): Order {
+  return {
+    id: record.id,
+    game: record.game,
+    gameColor: record.gameColor,
+    item: record.item,
+    amount: record.amount,
+    price: record.price,
+    status: record.status,
+    date: new Date(record.createdAt).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+  };
+}
+
+function OverviewTab({ user, orders }: { user: UserProfile; orders: Order[] }) {
   const [copied, setCopied] = useState(false);
 
   function copyId() {
@@ -342,7 +306,7 @@ function OverviewTab({ user }: { user: UserProfile }) {
     { label: "На сайте с", value: user.joinedAt, icon: Clock, color: "#4ade80" },
   ];
 
-  const recentOrders = mockOrders.slice(0, 3);
+  const recentOrders = orders.slice(0, 3);
 
   return (
     <div className="flex flex-col gap-6">
@@ -443,12 +407,18 @@ function OverviewTab({ user }: { user: UserProfile }) {
             Последние заказы
           </h3>
           <span className="text-white/30 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
-            {recentOrders.length} из {mockOrders.length}
+            {recentOrders.length} из {orders.length}
           </span>
         </div>
-        {recentOrders.map((order, i) => (
-          <OrderRow key={order.id} order={order} index={i} />
-        ))}
+        {recentOrders.length > 0 ? (
+          recentOrders.map((order, i) => (
+            <OrderRow key={order.id} order={order} index={i} />
+          ))
+        ) : (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Заказов пока нет
+          </div>
+        )}
       </motion.div>
     </div>
   );
@@ -498,7 +468,7 @@ function OrderRow({ order, index }: { order: Order; index: number }) {
 
 // ─── Orders Tab ───────────────────────────────────────────────────────────────
 
-function OrdersTab() {
+function OrdersTab({ orders }: { orders: Order[] }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -513,7 +483,7 @@ function OrdersTab() {
           className="text-xs px-3 py-1 rounded-full"
           style={{ background: "rgba(180,122,255,0.12)", color: "#B47AFF", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
         >
-          {mockOrders.length} заказов
+          {orders.length} заказов
         </span>
       </div>
       <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -526,7 +496,12 @@ function OrdersTab() {
           <span>Сумма</span>
           <span>Статус</span>
         </div>
-        {mockOrders.map((order, i) => {
+        {orders.length === 0 && (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            У вас пока нет заказов
+          </div>
+        )}
+        {orders.map((order, i) => {
           const sc = statusConfig[order.status];
           return (
             <motion.div
@@ -1051,6 +1026,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const { orders, ordersCount, totalSpent } = useUserOrders(user?.id);
 
   useEffect(() => {
     if (!user) {
@@ -1064,7 +1040,12 @@ export default function Dashboard() {
     return null;
   }
 
-  const profile = mapAuthUserToProfile(user);
+  const profile = {
+    ...mapAuthUserToProfile(user),
+    ordersCount,
+    totalSpent,
+  };
+  const mappedOrders = orders.map(mapOrderRecord);
 
   function handleLogout() {
     signOut();
@@ -1135,8 +1116,8 @@ export default function Dashboard() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              {activeTab === "overview" && <OverviewTab user={profile} />}
-              {activeTab === "orders" && <OrdersTab />}
+              {activeTab === "overview" && <OverviewTab user={profile} orders={mappedOrders} />}
+              {activeTab === "orders" && <OrdersTab orders={mappedOrders} />}
               {activeTab === "settings" && <SettingsTab user={profile} />}
               {activeTab === "moderation" && (profile.role === "moderator" || profile.role === "admin") && <ModerationTab />}
               {activeTab === "admin" && profile.role === "admin" && <AdminTab />}
