@@ -49,7 +49,7 @@ export function Register({ onNavigateLogin }: RegisterProps) {
     }
   }, [isAuthenticated, navigate]);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
     if (!agreed) {
@@ -62,11 +62,11 @@ export function Register({ onNavigateLogin }: RegisterProps) {
       return;
     }
 
-    const result = signUp({ username: nickname, email, password });
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+     const result = await signUp({ username: nickname, email, password });
+  if (!result.ok) {
+    setError(result.error);
+    return;
+  }
 
     setError("");
     navigate("/dashboard");
