@@ -25,17 +25,16 @@ export function Login({ onNavigateRegister }: LoginProps) {
     }
   }, [isAuthenticated, navigate]);
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const result = signIn(identifier, password);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
-
-    setError("");
-    navigate("/dashboard");
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  e.preventDefault();
+  const result = await signIn(identifier, password);
+  if (!result.ok) {
+    setError(result.error);
+    return;
   }
+  setError("");
+  navigate("/dashboard");
+}
 
   return (
     <div

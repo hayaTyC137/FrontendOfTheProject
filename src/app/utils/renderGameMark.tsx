@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 type GameMarkProps = {
   icon?: string | null;
   name: string;
-  emoji?: string;
   className?: string;
 };
 

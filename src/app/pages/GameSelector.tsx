@@ -1,6 +1,7 @@
-import { useState, forwardRef } from "react";
+import { useState, forwardRef, useEffect } from "react";
 import { motion } from "motion/react";
-import { games } from "../../data/packages";
+import { games as uiGames } from "../../data/packages";
+import { fetchGames, type GameApi } from "../../api/games";
 import { renderGameMark } from "../utils/renderGameMark";
 
 interface GameSelectorProps {
@@ -8,14 +9,25 @@ interface GameSelectorProps {
   onSelect: (gameId: string) => void;
 }
 
-interface GameSelectorProps {
-  selectedGame: string | null;
-  onSelect: (gameId: string) => void;
-}
+type GameView = GameApi & {
+  colorDim?: string;
+  colorGlow?: string;
+  productIconClass?: string;
+  usedFor?: string[];
+  emoji?: string;
+};
 
 export const GameSelector = forwardRef<HTMLElement, GameSelectorProps>(
   function GameSelector({ selectedGame, onSelect }, ref) {
     const [hovered, setHovered] = useState<string | null>(null);
+    const [games, setGames] = useState<GameView[]>([]);
+
+    useEffect(() => {
+      fetchGames().then((apiGames) => {
+        const uiById = Object.fromEntries(uiGames.map((g) => [g.id, g]));
+        setGames(apiGames.map((g) => ({ ...uiById[g.id], ...g })));
+      });
+    }, []);
 
     return (
       <section
@@ -77,6 +89,8 @@ export const GameSelector = forwardRef<HTMLElement, GameSelectorProps>(
             {games.map((game, i) => {
               const isActive = selectedGame === game.id;
               const isHovered = hovered === game.id;
+              const colorDim = game.colorDim ?? `${game.color}1A`;
+              const colorGlow = game.colorGlow ?? `${game.color}40`;
 
               return (
                 <motion.div
@@ -91,7 +105,7 @@ export const GameSelector = forwardRef<HTMLElement, GameSelectorProps>(
                   className="relative cursor-pointer rounded-2xl p-6 flex flex-col gap-4 overflow-hidden transition-all"
                   style={{
                     background: isActive
-                      ? game.colorDim
+                      ? colorDim
                       : isHovered
                       ? "rgba(255,255,255,0.04)"
                       : "rgba(255,255,255,0.025)",
@@ -103,9 +117,9 @@ export const GameSelector = forwardRef<HTMLElement, GameSelectorProps>(
                         : "rgba(255,255,255,0.07)"
                     }`,
                     boxShadow: isActive
-                      ? `0 0 30px ${game.colorGlow}, 0 0 60px ${game.colorGlow}`
+                      ? `0 0 30px ${colorGlow}, 0 0 60px ${colorGlow}`
                       : isHovered
-                      ? `0 0 20px ${game.colorGlow}`
+                      ? `0 0 20px ${colorGlow}`
                       : "none",
                     transform: isHovered || isActive ? "translateY(-4px) scale(1.02)" : "none",
                     transition: "all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)",
@@ -128,7 +142,7 @@ export const GameSelector = forwardRef<HTMLElement, GameSelectorProps>(
                       className="text-2xl"
                       style={{ filter: `drop-shadow(0 0 8px ${game.color}60)` }}
                     >
-                      {renderGameMark({ icon: game.icon, name: game.name, emoji: game.emoji, className: "w-12 h-12" })}
+                      {renderGameMark({ icon: game.icon, name: game.name, className: "w-12 h-12" })}
                     </span>
                     <span
                       className="px-2.5 py-1 rounded-full text-[10px]"
