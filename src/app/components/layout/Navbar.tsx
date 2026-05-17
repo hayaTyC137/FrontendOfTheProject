@@ -11,6 +11,8 @@ const games = [
   { id: "apex", name: "Apex Legends", color: "#FFB07A", currency: "Apex Coins" },
 ];
 
+const navItems = ["Главная", "Каталог", "Отзывы", "FAQ", "Контакты"];
+
 interface NavbarProps {
   onSelectGame: (gameId: string) => void;
   cartCount: number;
@@ -40,6 +42,17 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
     onSelectGame(gameId);
     setSearchQuery("");
     setSearchFocused(false);
+  }
+
+  function handleNavClick(item: string) {
+    if (item === "Отзывы") {
+      navigate("/reviews");
+      return;
+    }
+
+    if (item === "Главная") {
+      navigate("/");
+    }
   }
 
   useEffect(() => {
@@ -81,6 +94,7 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
     >
       {/* Logo */}
       <motion.div
+        onClick={() => navigate("/")}
         className="flex items-center gap-2 cursor-pointer select-none"
         whileHover={{ scale: 1.03 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -104,17 +118,18 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
 
       {/* Center nav */}
       <div className="hidden md:flex items-center gap-6">
-        {["Главная", "Каталог", "FAQ", "Контакты"].map((item) => (
-          <motion.a
+        {navItems.map((item) => (
+          <motion.button
             key={item}
-            href="#"
+            type="button"
+            onClick={() => handleNavClick(item)}
             className="text-sm text-white/50 hover:text-white/90 transition-colors"
             style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}
             whileHover={{ y: -1 }}
             transition={{ type: "spring", stiffness: 400 }}
           >
             {item}
-          </motion.a>
+          </motion.button>
         ))}
       </div>
 

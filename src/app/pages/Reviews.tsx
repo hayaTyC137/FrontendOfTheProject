@@ -1,42 +1,12 @@
 import { motion } from "motion/react";
-import { Star } from "lucide-react";
-
-const reviews = [
-  {
-    name: "Алексей К.",
-    game: "Valorant",
-    color: "#FF8A8A",
-    text: "Покупал VP несколько раз — всегда всё приходит за 2-3 минуты. Цены ниже, чем везде.",
-    stars: 5,
-    avatar: "АК",
-  },
-  {
-    name: "Мария В.",
-    game: "Fortnite",
-    color: "#B47AFF",
-    text: "Отличный сервис! V-Bucks пришли моментально. Поддержка очень быстро ответила на вопрос.",
-    stars: 5,
-    avatar: "МВ",
-  },
-  {
-    name: "Дмитрий Р.",
-    game: "Clash Royale",
-    color: "#7ABAFF",
-    text: "Gems купил на 2500 — пришли мгновенно. Буду заказывать снова, надёжный магазин.",
-    stars: 5,
-    avatar: "ДР",
-  },
-  {
-    name: "Егор Ф.",
-    game: "Apex Legends",
-    color: "#FFB07A",
-    text: "Apex Coins без проблем! Уже 4-й раз покупаю, всегда доволен. Рекомендую!",
-    stars: 5,
-    avatar: "ЕМ",
-  },
-];
+import { ArrowRight, Star } from "lucide-react";
+import { useNavigate } from "react-router";
+import { fallbackReviews } from "../../data/reviews";
 
 export function Reviews() {
+  const navigate = useNavigate();
+  const reviews = fallbackReviews.slice(0, 4);
+
   return (
     <section
       className="relative py-24 px-6"
@@ -73,6 +43,23 @@ export function Reviews() {
           >
             Нам доверяют тысячи игроков
           </h2>
+          <motion.button
+            type="button"
+            onClick={() => navigate("/reviews")}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm text-white"
+            style={{
+              background: "rgba(180,122,255,0.12)",
+              border: "1px solid rgba(180,122,255,0.24)",
+              boxShadow: "0 0 22px rgba(180,122,255,0.14)",
+              fontFamily: "Inter, sans-serif",
+              fontWeight: 700,
+            }}
+            whileHover={{ scale: 1.03, background: "rgba(180,122,255,0.18)" }}
+            whileTap={{ scale: 0.97 }}
+          >
+            Все отзывы
+            <ArrowRight size={14} />
+          </motion.button>
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -89,7 +76,7 @@ export function Reviews() {
                 border: "1px solid rgba(255,255,255,0.07)",
               }}
               whileHover={{
-                borderColor: `${review.color}30`,
+                borderColor: `${review.gameColor}30`,
                 background: "rgba(255,255,255,0.045)",
                 y: -3,
               }}
@@ -97,7 +84,7 @@ export function Reviews() {
               {/* Stars */}
               <div className="flex gap-1">
                 {Array.from({ length: review.stars }).map((_, j) => (
-                  <Star key={j} size={13} style={{ color: review.color }} fill={review.color} />
+                  <Star key={j} size={13} style={{ color: review.gameColor }} fill={review.gameColor} />
                 ))}
               </div>
 
@@ -114,11 +101,11 @@ export function Reviews() {
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-xs flex-shrink-0"
                   style={{
-                    background: `${review.color}20`,
-                    color: review.color,
+                    background: `${review.gameColor}20`,
+                    color: review.gameColor,
                     fontFamily: "Inter, sans-serif",
                     fontWeight: 700,
-                    border: `1px solid ${review.color}30`,
+                    border: `1px solid ${review.gameColor}30`,
                   }}
                 >
                   {review.avatar}
@@ -132,7 +119,7 @@ export function Reviews() {
                   </div>
                   <div
                     className="text-xs"
-                    style={{ color: review.color, fontFamily: "Inter, sans-serif", opacity: 0.75 }}
+                    style={{ color: review.gameColor, fontFamily: "Inter, sans-serif", opacity: 0.75 }}
                   >
                     {review.game}
                   </div>

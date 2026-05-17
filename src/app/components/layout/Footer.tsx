@@ -4,7 +4,7 @@ import { RiTelegram2Line, RiVkLine, RiDiscordLine } from "react-icons/ri";
 
 const links = {
   Услуги: ["Valorant Points", "Gems CR", "V-Bucks", "Apex Coins"],
-  Компания: ["О нас", "FAQ", "Блог", "Вакансии"],
+  Компания: ["О нас", "Отзывы", "FAQ", "Блог", "Вакансии"],
   Поддержка: ["Контакты", "Гарантии", "Возврат", "Telegram"],
 };
 
@@ -102,7 +102,7 @@ export function Footer() {
                 {items.map((item) => (
                   <li key={item}>
                     <motion.a
-                      href="#"
+                      href={item === "Отзывы" ? "/reviews" : "#"}
                       className="text-white/35 hover:text-white/75 text-sm transition-colors"
                       style={{ fontFamily: "Inter, sans-serif" }}
                       whileHover={{ x: 3 }}

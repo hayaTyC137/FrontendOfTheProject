@@ -11,7 +11,8 @@ import { Login } from "./app/pages/login";
 import { Register } from "./app/pages/register";
 import { ProductPage } from "./app/pages/ProductPage";
 import { CartPage } from "./app/pages/CartPage";
-import Dashboard from "./app/pages/Dashboard";
+import { ReviewsPage } from "./app/pages/ReviewsPage";
+import Dashboard from "./app/pages/DashBoard";
 import { useAuth } from "./app/context/AuthContext";
 import { useCart } from "./app/context/CartContext";
 
@@ -71,6 +72,7 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/cart" element={<CartPage />} />
+      <Route path="/reviews" element={<ReviewsPage />} />
       <Route path="/dashboard" element={<DashboardRoute />} />
     </Routes>
   );

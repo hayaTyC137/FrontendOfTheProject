@@ -71,12 +71,6 @@ type Order = {
   date: string;
 };
 
-const adminUsers = [
-  { id: "usr_8271", username: "Egorka_Pro", role: "user", email: "egorka@gmail.com", orders: 14, spent: 342.87, status: "active" },
-  { id: "usr_5512", username: "Dragon_777", role: "moderator", email: "dragon@mail.ru", orders: 8, spent: 180.0, status: "active" },
-  { id: "usr_3349", username: "NightWolf", role: "user", email: "wolf@yandex.ru", orders: 3, spent: 59.97, status: "banned" },
-  { id: "usr_1187", username: "StarCraft99", role: "user", email: "star@gmail.com", orders: 22, spent: 719.5, status: "active" },
-];
 
 // ─── Role config ──────────────────────────────────────────────────────────────
 
@@ -85,6 +79,8 @@ const roleConfig: Record<Role, { label: string; color: string; bg: string; icon:
   moderator: { label: "Модератор", color: "#B47AFF", bg: "rgba(180,122,255,0.12)", icon: Shield },
   admin: { label: "Администратор", color: "#FFB07A", bg: "rgba(255,176,122,0.12)", icon: Crown },
 };
+
+const roleOptions: Role[] = ["user", "moderator", "admin"];
 
 const statusConfig = {
   completed: { label: "Выполнен", color: "#4ade80", bg: "rgba(74,222,128,0.1)" },
@@ -150,7 +146,7 @@ function Sidebar({
 
   return (
     <aside
-      className="w-64 flex-shrink-0 flex flex-col"
+      className="w-64 flex-shrink-0 self-start flex flex-col"
       style={{
         background: "rgba(255,255,255,0.03)",
         border: "1px solid rgba(255,255,255,0.07)",
@@ -569,14 +565,14 @@ function SettingsTab({ user }: { user: UserProfile }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col gap-5"
+      className="flex w-full min-w-0 flex-col gap-5"
     >
       <h2 className="text-white text-lg" style={{ fontWeight: 800, fontFamily: "Inter, sans-serif", letterSpacing: "-0.02em" }}>
         Настройки
       </h2>
 
       {/* Profile section */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-full min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
           <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
             Профиль
@@ -584,9 +580,9 @@ function SettingsTab({ user }: { user: UserProfile }) {
         </div>
         <div className="p-5 flex flex-col gap-4">
           {/* Avatar */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold"
+              className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
               style={{
                 background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
                 boxShadow: "0 0 24px rgba(180,122,255,0.3)",
@@ -595,7 +591,7 @@ function SettingsTab({ user }: { user: UserProfile }) {
             >
               {user.username[0]}
             </div>
-            <div>
+            <div className="min-w-0">
               <motion.button
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white/70"
                 style={{
@@ -617,8 +613,8 @@ function SettingsTab({ user }: { user: UserProfile }) {
           </div>
 
           {/* Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
+          <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="min-w-0">
               <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
                 Никнейм
               </label>
@@ -642,7 +638,7 @@ function SettingsTab({ user }: { user: UserProfile }) {
                 />
               </div>
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
                 Email
               </label>
@@ -685,7 +681,7 @@ function SettingsTab({ user }: { user: UserProfile }) {
       </div>
 
       {/* Security */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-full min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
           <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
             Безопасность
@@ -695,7 +691,7 @@ function SettingsTab({ user }: { user: UserProfile }) {
           <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
             Новый пароль
           </label>
-          <div className="relative max-w-sm">
+          <div className="relative w-full max-w-sm">
             <Lock
               size={14}
               className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
@@ -723,7 +719,7 @@ function SettingsTab({ user }: { user: UserProfile }) {
       </div>
 
       {/* Notifications */}
-      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+      <div className="w-full min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
           <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
             Уведомления
@@ -735,10 +731,10 @@ function SettingsTab({ user }: { user: UserProfile }) {
             { key: "promo" as const, label: "Акции и скидки", desc: "Специальные предложения и акции" },
             { key: "security" as const, label: "Безопасность", desc: "Вход с нового устройства" },
           ].map((n) => (
-            <div key={n.key} className="flex items-center justify-between">
-              <div>
-                <p className="text-white text-sm" style={{ fontWeight: 600, fontFamily: "Inter, sans-serif" }}>{n.label}</p>
-                <p className="text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{n.desc}</p>
+            <div key={n.key} className="flex min-w-0 items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="truncate text-white text-sm" style={{ fontWeight: 600, fontFamily: "Inter, sans-serif" }}>{n.label}</p>
+                <p className="truncate text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{n.desc}</p>
               </div>
               <button
                 onClick={() => setNotifications((prev) => ({ ...prev, [n.key]: !prev[n.key] }))}
@@ -1000,24 +996,69 @@ function AdminTab() {
                 <span>${u.totalSpent.toFixed(0)}</span>
               </div>
 
-              {/* Role select */}
-              <select
-                value={u.role}
-                onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                className="text-xs px-2 py-1 rounded-md outline-none"
+              {/* Role switcher */}
+              <div
+                className="flex items-center gap-1 rounded-xl p-1 flex-shrink-0"
                 style={{
-                  background: rc.bg,
-                  color: rc.color,
-                  border: `1px solid ${rc.color}30`,
-                  fontFamily: "Inter, sans-serif",
-                  fontWeight: 600,
-                  cursor: "pointer",
+                  background: "rgba(255,255,255,0.035)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
                 }}
               >
-                <option value="user">Пользователь</option>
-                <option value="moderator">Модератор</option>
-                <option value="admin">Администратор</option>
-              </select>
+                <div
+                  className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg mr-1"
+                  style={{
+                    background: rc.bg,
+                    color: rc.color,
+                    border: `1px solid ${rc.color}26`,
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: 700,
+                  }}
+                >
+                  <RoleIcon size={11} />
+                  <span className="text-[11px]">{rc.label}</span>
+                </div>
+
+                {roleOptions.map((role) => {
+                  const option = roleConfig[role];
+                  const OptionIcon = option.icon;
+                  const selected = u.role === role;
+
+                  return (
+                    <motion.button
+                      key={role}
+                      type="button"
+                      onClick={() => {
+                        if (!selected) handleRoleChange(u.id, role);
+                      }}
+                      className="relative w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                      style={{
+                        color: selected ? option.color : "rgba(255,255,255,0.32)",
+                        background: selected ? option.bg : "transparent",
+                        border: selected ? `1px solid ${option.color}35` : "1px solid transparent",
+                        boxShadow: selected ? `0 0 16px ${option.color}22` : "none",
+                      }}
+                      whileHover={{
+                        scale: 1.06,
+                        background: selected ? option.bg : "rgba(255,255,255,0.06)",
+                        color: selected ? option.color : "rgba(255,255,255,0.7)",
+                      }}
+                      whileTap={{ scale: 0.94 }}
+                      title={`Сделать роль: ${option.label}`}
+                      aria-label={`Сделать роль: ${option.label}`}
+                      aria-pressed={selected}
+                    >
+                      <OptionIcon size={13} />
+                      {selected && (
+                        <span
+                          className="absolute -bottom-0.5 left-1/2 h-0.5 w-3 -translate-x-1/2 rounded-full"
+                          style={{ background: option.color, boxShadow: `0 0 8px ${option.color}` }}
+                        />
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 {/* Ban/Unban */}
@@ -1134,7 +1175,12 @@ export default function Dashboard() {
           borderBottom: "1px solid rgba(255,255,255,0.05)",
         }}
       >
-        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 rounded-xl outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-white/20"
+          title="На главную"
+        >
           <div
             className="w-7 h-7 rounded-lg flex items-center justify-center"
             style={{
@@ -1147,15 +1193,8 @@ export default function Dashboard() {
           <span className="text-white text-sm" style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
             EgorkaCoins
           </span>
-        </div>
+        </button>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleLogout}
-            className="text-white/30 text-xs hover:text-white/50 transition-colors"
-            style={{ fontFamily: "Inter, sans-serif" }}
-          >
-            Выйти
-          </button>
           <button
             className="relative w-8 h-8 rounded-xl flex items-center justify-center text-white/40 hover:text-white/70 transition-colors"
             style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}
@@ -1181,6 +1220,7 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
+              className="w-full min-w-0"
             >
               {activeTab === "overview" && <OverviewTab user={profile} orders={mappedOrders} />}
               {activeTab === "orders" && <OrdersTab orders={mappedOrders} />}
