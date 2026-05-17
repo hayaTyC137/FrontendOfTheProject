@@ -32,11 +32,20 @@ import {
 import { useAuth, type AuthUser, type Role } from "../context/AuthContext";
 import { useUserOrders } from "../hooks/useUserOrders.ts";
 import type { OrderRecord } from "../services/ordersStorage.ts";
+import {
+  fetchAdminStats,
+  fetchAllUsers,
+  banUser,
+  deleteUser,
+  setUserRole,
+  type AdminStats,
+  type UserAdmin,
+} from "../../api/admin";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface UserProfile {
-  id: string;
+  id: number;
   username: string;
   email: string;
   avatar?: string;
@@ -841,12 +850,57 @@ function ModerationTab() {
 // ─── Admin Tab ────────────────────────────────────────────────────────────────
 
 function AdminTab() {
-  const siteStats = [
-    { label: "Пользователей", value: "1 248", icon: Users, color: "#7ABAFF", change: "+12%" },
-    { label: "Заказов сегодня", value: "87", icon: ShoppingBag, color: "#B47AFF", change: "+5%" },
-    { label: "Выручка", value: "$4 219", icon: TrendingUp, color: "#4ade80", change: "+18%" },
-    { label: "Жалоб", value: "2", icon: AlertTriangle, color: "#FF8A8A", change: "-3" },
-  ];
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [users, setUsers] = useState<UserAdmin[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([fetchAdminStats(), fetchAllUsers()]).then(
+      ([statsData, usersData]) => {
+        setStats(statsData);
+        setUsers(usersData);
+        setLoading(false);
+      }
+    );
+  }, []);
+
+  async function handleBan(id: number, isBanned: boolean) {
+    await banUser(id, !isBanned);
+    setUsers(prev =>
+      prev.map(u => u.id === id ? { ...u, isBanned: !isBanned } : u)
+    );
+  }
+
+  async function handleDelete(id: number) {
+    await deleteUser(id);
+    setUsers(prev => prev.filter(u => u.id !== id));
+  }
+
+  async function handleRoleChange(id: number, newRole: string) {
+    await setUserRole(id, newRole);
+    setUsers(prev =>
+      prev.map(u => u.id === id ? { ...u, role: newRole } : u)
+    );
+  }
+
+  const siteStats = stats
+    ? [
+        { label: "Пользователей",  value: String(stats.totalUsers),          icon: Users,         color: "#7ABAFF", change: "" },
+        { label: "Заказов сегодня", value: String(stats.ordersToday),         icon: ShoppingBag,   color: "#B47AFF", change: "" },
+        { label: "Выручка",         value: `$${stats.totalRevenue.toFixed(0)}`, icon: TrendingUp,  color: "#4ade80", change: "" },
+        { label: "Жалоб",           value: String(stats.openReports),         icon: AlertTriangle, color: "#FF8A8A", change: "" },
+      ]
+    : [];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <p className="text-white/30 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+          Загрузка...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -882,18 +936,9 @@ function AdminTab() {
               style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
             >
               <div className="flex items-start justify-between mb-3">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: `${s.color}18` }}
-                >
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${s.color}18` }}>
                   <Icon size={15} style={{ color: s.color }} />
                 </div>
-                <span
-                  className="text-xs"
-                  style={{ color: s.change.startsWith("+") ? "#4ade80" : "#FF8A8A", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
-                >
-                  {s.change}
-                </span>
               </div>
               <p className="text-white text-xl" style={{ fontWeight: 800, fontFamily: "Inter, sans-serif", letterSpacing: "-0.02em" }}>
                 {s.value}
@@ -911,8 +956,15 @@ function AdminTab() {
             Управление пользователями
           </h3>
         </div>
-        {adminUsers.map((u, i) => {
-          const rc = roleConfig[u.role as Role];
+
+        {users.length === 0 && (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Пользователей нет
+          </div>
+        )}
+
+        {users.map((u, i) => {
+          const rc = roleConfig[u.role as Role] ?? roleConfig.user;
           const RoleIcon = rc.icon;
           return (
             <motion.div
@@ -924,66 +976,74 @@ function AdminTab() {
             >
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                style={{
-                  background: "linear-gradient(135deg, #B47AFF33 0%, #FF8A8A33 100%)",
-                  fontFamily: "Inter, sans-serif",
-                }}
+                style={{ background: "linear-gradient(135deg, #B47AFF33 0%, #FF8A8A33 100%)", fontFamily: "Inter, sans-serif" }}
               >
                 {u.username[0]}
               </div>
+
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-white text-sm" style={{ fontWeight: 600, fontFamily: "Inter, sans-serif" }}>
                     {u.username}
                   </p>
-                  {u.status === "banned" && (
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded"
-                      style={{ background: "rgba(255,138,138,0.1)", color: "#FF8A8A", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
-                    >
+                  {u.isBanned && (
+                    <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: "rgba(255,138,138,0.1)", color: "#FF8A8A", fontWeight: 600 }}>
                       Бан
                     </span>
                   )}
                 </div>
                 <p className="text-white/30 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{u.email}</p>
               </div>
+
               <div className="hidden md:flex items-center gap-3 text-white/40 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
-                <span>{u.orders} заказов</span>
-                <span>${u.spent.toFixed(0)}</span>
+                <span>{u.ordersCount} заказов</span>
+                <span>${u.totalSpent.toFixed(0)}</span>
               </div>
-              <span
-                className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md flex-shrink-0"
-                style={{ background: rc.bg, color: rc.color, fontWeight: 600, fontFamily: "Inter, sans-serif" }}
+
+              {/* Role select */}
+              <select
+                value={u.role}
+                onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                className="text-xs px-2 py-1 rounded-md outline-none"
+                style={{
+                  background: rc.bg,
+                  color: rc.color,
+                  border: `1px solid ${rc.color}30`,
+                  fontFamily: "Inter, sans-serif",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
               >
-                <RoleIcon size={9} />
-                {rc.label}
-              </span>
+                <option value="user">Пользователь</option>
+                <option value="moderator">Модератор</option>
+                <option value="admin">Администратор</option>
+              </select>
+
               <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Ban/Unban */}
                 <motion.button
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white/25 hover:text-white/60 transition-colors"
-                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.93 }}
-                >
-                  <Edit3 size={11} />
-                </motion.button>
-                <motion.button
+                  onClick={() => handleBan(u.id, u.isBanned)}
                   className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                   style={{
-                    background: u.status === "banned" ? "rgba(74,222,128,0.08)" : "rgba(255,138,138,0.08)",
-                    border: u.status === "banned" ? "1px solid rgba(74,222,128,0.15)" : "1px solid rgba(255,138,138,0.15)",
-                    color: u.status === "banned" ? "#4ade80" : "#FF8A8A",
+                    background: u.isBanned ? "rgba(74,222,128,0.08)" : "rgba(255,138,138,0.08)",
+                    border: u.isBanned ? "1px solid rgba(74,222,128,0.15)" : "1px solid rgba(255,138,138,0.15)",
+                    color: u.isBanned ? "#4ade80" : "#FF8A8A",
                   }}
                   whileHover={{ scale: 1.08 }}
                   whileTap={{ scale: 0.93 }}
+                  title={u.isBanned ? "Разбанить" : "Забанить"}
                 >
                   <Ban size={11} />
                 </motion.button>
+
+                {/* Delete */}
                 <motion.button
+                  onClick={() => handleDelete(u.id)}
                   className="w-7 h-7 rounded-lg flex items-center justify-center text-white/20 hover:text-red-400 transition-colors"
                   style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
                   whileHover={{ scale: 1.08 }}
                   whileTap={{ scale: 0.93 }}
+                  title="Удалить пользователя"
                 >
                   <Trash2 size={11} />
                 </motion.button>
@@ -1003,12 +1063,16 @@ function mapAuthUserToProfile(user: AuthUser): UserProfile {
     id: user.id,
     username: user.username,
     email: user.email,
-    avatar: user.avatar,
+    avatar: undefined,
     role: user.role,
     balance: user.balance,
     totalSpent: user.totalSpent,
     ordersCount: user.ordersCount,
-    joinedAt: user.joinedAt,
+    joinedAt: new Date(user.createdAt).toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
     level: user.level,
     xp: user.xp,
     xpToNext: user.xpToNext,
@@ -1026,7 +1090,9 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
-  const { orders, ordersCount, totalSpent } = useUserOrders(user?.id);
+  const { orders, ordersCount, totalSpent } = useUserOrders(
+  user?.id != null ? String(user.id) : null
+);
 
   useEffect(() => {
     if (!user) {

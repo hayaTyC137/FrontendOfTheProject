@@ -1,9 +1,31 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  readOrdersByUser,
-  subscribeOrdersUpdated,
-  type OrderRecord,
-} from "../services/ordersStorage.ts";
+import { useEffect, useState } from "react";
+import { fetchMyOrders, type OrderApi } from "../../api/orders";
+
+export type OrderRecord = {
+  id: string;
+  userId: string;
+  game: string;
+  gameColor: string;
+  item: string;
+  amount: string;
+  price: number;
+  status: "completed" | "pending" | "failed";
+  createdAt: string;
+};
+
+function mapApiToRecord(order: OrderApi): OrderRecord {
+  return {
+    id: String(order.id),
+    userId: String(order.userId),
+    game: order.gameName,
+    gameColor: order.gameColor,
+    item: order.item,
+    amount: order.amount,
+    price: order.price,
+    status: order.status as "completed" | "pending" | "failed",
+    createdAt: order.createdAt,
+  };
+}
 
 export function useUserOrders(userId: string | null | undefined) {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -14,22 +36,18 @@ export function useUserOrders(userId: string | null | undefined) {
       return;
     }
 
-    const sync = () => setOrders(readOrdersByUser(userId));
-    sync();
-
-    return subscribeOrdersUpdated(sync);
+    fetchMyOrders().then(apiOrders => {
+      setOrders(apiOrders.map(mapApiToRecord));
+    });
   }, [userId]);
 
-  const stats = useMemo(() => {
-    const totalSpent = orders.reduce((sum, order) => sum + order.price, 0);
-    return {
-      totalSpent: Number(totalSpent.toFixed(2)),
-      ordersCount: orders.length,
-    };
-  }, [orders]);
+  const totalSpent = Number(
+    orders.reduce((sum, o) => sum + o.price, 0).toFixed(2)
+  );
 
   return {
     orders,
-    ...stats,
+    totalSpent,
+    ordersCount: orders.length,
   };
 }

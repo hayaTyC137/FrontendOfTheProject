@@ -7,7 +7,8 @@ import {
 import { useCart } from "../context/CartContext";
 import { renderGameMark } from "../utils/renderGameMark";
 import { useAuth } from "../context/AuthContext";
-import { createOrdersFromCart } from "../services/ordersStorage.ts";
+import { createOrders } from '../../api/orders';
+import { getGameById } from '../../data/packages';
 
 export function CartPage() {
   const navigate = useNavigate();
@@ -16,22 +17,32 @@ export function CartPage() {
 
   const isEmpty = items.length === 0;
 
-  function handleCheckout() {
+  async function handleCheckout() {
     if (items.length === 0) return;
 
     if (!user) {
       navigate("/login");
       return;
-    }
-
-    createOrdersFromCart({
-      userId: user.id,
-      items,
-      status: "pending",
-    });
-    clearCart();
-    navigate("/dashboard");
   }
+    const orderItems = items.map(item => {
+    const game = getGameById(item.pkg.gameId);
+    return {
+      gameName: item.gameName,
+      gameColor: item.gameColor,
+      item: item.pkg.label,
+      amount: `${item.pkg.amount} ${game?.abbr ?? ""}`.trim(),
+      price: item.pkg.price * item.quantity,
+    };
+  });
+
+  const result = await createOrders(orderItems);
+  if (!result.ok) {
+    console.error("Ошибка создания заказа:", result.error);
+    return;
+  }
+  clearCart();
+  navigate("/dashboard");
+}
 
   return (
     <div
