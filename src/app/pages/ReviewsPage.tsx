@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import {
   ArrowLeft,
+  Loader2,
   MessageCircle,
+  Send,
   ShieldCheck,
   ShoppingCart,
   Star,
@@ -10,8 +12,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { fetchReviews, type ReviewApi } from "../../api/reviews";
+import { fetchGames, type GameApi } from "../../api/games";
+import { createReview, fetchReviews, type ReviewApi } from "../../api/reviews";
 import { fallbackReviews, type ReviewView } from "../../data/reviews";
+import { GameReviewSelect } from "../components/GameReviewSelect";
 import { Footer } from "../components/layout/Footer";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
@@ -160,14 +164,22 @@ function ReviewCard({ review, index }: { review: ReviewView; index: number }) {
 export function ReviewsPage() {
   const navigate = useNavigate();
   const { totalCount } = useCart();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [reviews, setReviews] = useState<ReviewView[]>([]);
   const [source, setSource] = useState<ReviewsSource>("fallback");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [games, setGames] = useState<GameApi[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState("");
+  const [reviewText, setReviewText] = useState("");
+  const [reviewStars, setReviewStars] = useState(5);
+  const [formOpen, setFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadReviews = useCallback(() => {
     let mounted = true;
+    setIsLoading(true);
 
     fetchReviews().then((result) => {
       if (!mounted) return;
@@ -190,6 +202,24 @@ export function ReviewsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    return loadReviews();
+  }, [loadReviews]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchGames().then((items) => {
+      if (!mounted) return;
+      setGames(items);
+      setSelectedGameId((current) => current || items[0]?.id || "");
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const averageRating = useMemo(() => {
     if (reviews.length === 0) return "0.0";
     const total = reviews.reduce((sum, review) => sum + review.stars, 0);
@@ -198,6 +228,55 @@ export function ReviewsPage() {
 
   const gamesCount = useMemo(() => new Set(reviews.map((review) => review.game)).size, [reviews]);
   const visibleReviews = isLoading ? fallbackReviews.slice(0, 6).map(normalizeReview) : reviews;
+  const selectedGame = games.find((game) => game.id === selectedGameId) ?? games[0];
+
+  function handleLeaveReview() {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    setFormOpen(true);
+  }
+
+  async function handleCreateReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const text = reviewText.trim();
+    if (!selectedGame) {
+      setFormError("Выберите игру");
+      return;
+    }
+
+    if (text.length < 5) {
+      setFormError("Напишите отзыв чуть подробнее");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError(null);
+
+    const result = await createReview({
+      game: selectedGame.name,
+      gameColor: selectedGame.color || "#B47AFF",
+      text,
+      stars: reviewStars,
+    });
+
+    setIsSubmitting(false);
+
+    if (!result.ok) {
+      setFormError(result.error);
+      return;
+    }
+
+    const created = normalizeReview(result.data, 0);
+    setReviews((current) => [created, ...current.filter((review) => review.id !== created.id)]);
+    setSource("api");
+    setReviewText("");
+    setReviewStars(5);
+    setFormOpen(false);
+  }
 
   return (
     <div
@@ -322,8 +401,24 @@ export function ReviewsPage() {
               Реальные впечатления игроков
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-relaxed text-white/45 md:text-base">
-              Собираем отзывы после покупок игровой валюты. Когда backend будет готов, эта страница начнет брать данные из сервера автоматически.
+              Собираем отзывы игроков после покупок игровой валюты. Авторизуйтесь и оставьте свой отзыв - он сразу появится в общем списке.
             </p>
+            <motion.button
+              type="button"
+              onClick={handleLeaveReview}
+              className="mt-7 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm text-white"
+              style={{
+                background: "rgba(180,122,255,0.16)",
+                border: "1px solid rgba(180,122,255,0.28)",
+                boxShadow: "0 0 24px rgba(180,122,255,0.16)",
+                fontWeight: 800,
+              }}
+              whileHover={{ scale: 1.03, background: "rgba(180,122,255,0.22)" }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <MessageCircle size={16} />
+              Оставить отзыв
+            </motion.button>
           </motion.div>
 
           <motion.div
@@ -356,6 +451,112 @@ export function ReviewsPage() {
           </motion.div>
         </section>
 
+        {formOpen && isAuthenticated && (
+          <motion.form
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            onSubmit={handleCreateReview}
+            className="mb-8 rounded-2xl p-5"
+            style={{
+              background: "rgba(255,255,255,0.035)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 18px 60px rgba(0,0,0,0.28)",
+            }}
+          >
+            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-white text-base" style={{ fontWeight: 800 }}>
+                  Новый отзыв
+                </h2>
+                <p className="mt-1 text-xs text-white/35">
+                  От имени {user?.username}. Имя и avatar подставятся автоматически.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="self-start rounded-xl px-3 py-2 text-xs text-white/45 transition-colors hover:text-white/70"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", fontWeight: 700 }}
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+              <GameReviewSelect
+                games={games}
+                value={selectedGameId}
+                onChange={setSelectedGameId}
+              />
+
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-white/35" style={{ fontWeight: 700 }}>
+                  Оценка
+                </span>
+                <div className="flex h-11 items-center gap-1 rounded-xl px-3" style={{ background: "rgba(8,8,14,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                  {Array.from({ length: 5 }).map((_, index) => {
+                    const value = index + 1;
+                    const filled = value <= reviewStars;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setReviewStars(value)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06]"
+                        aria-label={`Оценка ${value}`}
+                      >
+                        <Star
+                          size={18}
+                          style={{ color: filled ? selectedGame?.color ?? "#B47AFF" : "rgba(255,255,255,0.18)" }}
+                          fill={filled ? selectedGame?.color ?? "#B47AFF" : "transparent"}
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <label className="mt-4 flex flex-col gap-2">
+              <span className="text-xs text-white/35" style={{ fontWeight: 700 }}>
+                Текст отзыва
+              </span>
+              <textarea
+                value={reviewText}
+                onChange={(event) => setReviewText(event.target.value)}
+                rows={4}
+                className="resize-none rounded-xl px-4 py-3 text-sm text-white outline-none placeholder:text-white/20"
+                placeholder="Расскажите, как прошла покупка"
+                style={{
+                  background: "rgba(8,8,14,0.55)",
+                  border: "1px solid rgba(255,255,255,0.09)",
+                  lineHeight: 1.55,
+                }}
+              />
+            </label>
+
+            {formError && <p className="mt-3 text-sm text-red-300">{formError}</p>}
+
+            <div className="mt-5 flex justify-end">
+              <motion.button
+                type="submit"
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: selectedGame ? `${selectedGame.color}28` : "rgba(180,122,255,0.16)",
+                  border: `1px solid ${selectedGame?.color ?? "#B47AFF"}44`,
+                  fontWeight: 800,
+                }}
+                whileHover={isSubmitting ? undefined : { scale: 1.03 }}
+                whileTap={isSubmitting ? undefined : { scale: 0.97 }}
+              >
+                {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                Отправить
+              </motion.button>
+            </div>
+          </motion.form>
+        )}
+
         {(source === "fallback" || error) && !isLoading && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -366,7 +567,7 @@ export function ReviewsPage() {
               border: "1px solid rgba(180,122,255,0.16)",
             }}
           >
-            Backend для отзывов пока не подключен, поэтому показаны демо-отзывы. Страница уже готова к `GET /api/reviews`.
+            Не удалось получить отзывы с сервера, поэтому временно показаны демо-отзывы.
           </motion.div>
         )}
 

@@ -6,6 +6,7 @@ import {
   ShoppingBag,
   Settings,
   LogOut,
+  MessageCircle,
   Shield,
   Crown,
   Zap,
@@ -41,6 +42,16 @@ import {
   type AdminStats,
   type UserAdmin,
 } from "../../api/admin";
+import {
+  deleteReview,
+  deleteMyReview,
+  fetchReviews,
+  fetchMyReviews,
+  updateReview,
+  type ReviewApi,
+} from "../../api/reviews";
+import { fetchGames, type GameApi } from "../../api/games";
+import { GameReviewSelect } from "../components/GameReviewSelect";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +133,7 @@ function BgGlows() {
 const navItems: { id: string; label: string; icon: typeof User; roles: Role[] }[] = [
   { id: "overview", label: "Обзор", icon: BarChart2, roles: ["user", "moderator", "admin"] },
   { id: "orders", label: "Мои заказы", icon: ShoppingBag, roles: ["user", "moderator", "admin"] },
+  { id: "reviews", label: "Мои отзывы", icon: MessageCircle, roles: ["user", "moderator", "admin"] },
   { id: "settings", label: "Настройки", icon: Settings, roles: ["user", "moderator", "admin"] },
   { id: "moderation", label: "Модерация", icon: Shield, roles: ["moderator", "admin"] },
   { id: "admin", label: "Панель Админа", icon: Crown, roles: ["admin"] },
@@ -552,6 +564,359 @@ function OrdersTab({ orders }: { orders: Order[] }) {
   );
 }
 
+// ─── My Reviews Tab ──────────────────────────────────────────────────────────
+
+function formatDate(value?: string) {
+  if (!value) return "Недавно";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Недавно";
+
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function MyReviewsTab() {
+  const [reviews, setReviews] = useState<ReviewApi[]>([]);
+  const [games, setGames] = useState<GameApi[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | string | null>(null);
+  const [editingId, setEditingId] = useState<number | string | null>(null);
+  const [savingId, setSavingId] = useState<number | string | null>(null);
+  const [editGameId, setEditGameId] = useState("");
+  const [editStars, setEditStars] = useState(5);
+  const [editText, setEditText] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    Promise.all([fetchMyReviews(), fetchGames()]).then(([result, gameItems]) => {
+      if (!mounted) return;
+
+      if (result.ok) {
+        setReviews(result.data);
+        setError(null);
+      } else {
+        setError(result.error);
+      }
+
+      setGames(gameItems);
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  function startEdit(review: ReviewApi) {
+    const matchedGame = games.find((game) => game.name === review.game);
+    setEditingId(review.id);
+    setEditGameId(matchedGame?.id ?? games[0]?.id ?? "");
+    setEditStars(Math.min(5, Math.max(1, Math.round(review.stars))));
+    setEditText(review.text);
+    setError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditGameId("");
+    setEditStars(5);
+    setEditText("");
+  }
+
+  async function handleSave(review: ReviewApi) {
+    const text = editText.trim();
+    if (text.length < 5) {
+      setError("Напишите отзыв чуть подробнее");
+      return;
+    }
+
+    const selectedGame = games.find((game) => game.id === editGameId);
+    setSavingId(review.id);
+    setError(null);
+
+    const result = await updateReview(review.id, {
+      game: selectedGame?.name ?? review.game,
+      gameColor: selectedGame?.color ?? review.gameColor ?? "#B47AFF",
+      text,
+      stars: editStars,
+    });
+
+    setSavingId(null);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setReviews((current) =>
+      current.map((item) => (item.id === review.id ? result.data : item))
+    );
+    cancelEdit();
+  }
+
+  async function handleDelete(id: number | string) {
+    setDeletingId(id);
+    setError(null);
+
+    const result = await deleteMyReview(id);
+    setDeletingId(null);
+
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setReviews((current) => current.filter((review) => review.id !== id));
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="flex flex-col gap-5"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-white text-lg" style={{ fontWeight: 800, fontFamily: "Inter, sans-serif", letterSpacing: "-0.02em" }}>
+            Мои отзывы
+          </h2>
+          <p className="mt-1 text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Здесь можно посмотреть, отредактировать и удалить свои опубликованные отзывы.
+          </p>
+        </div>
+        <span
+          className="w-fit rounded-full px-3 py-1 text-xs"
+          style={{ background: "rgba(180,122,255,0.12)", color: "#B47AFF", fontWeight: 700, fontFamily: "Inter, sans-serif" }}
+        >
+          {reviews.length} отзывов
+        </span>
+      </div>
+
+      {error && (
+        <div
+          className="rounded-2xl px-5 py-4 text-sm text-red-200"
+          style={{ background: "rgba(255,138,138,0.08)", border: "1px solid rgba(255,138,138,0.16)", fontFamily: "Inter, sans-serif" }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        {loading && (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Загрузка отзывов...
+          </div>
+        )}
+
+        {!loading && reviews.length === 0 && (
+          <div className="px-5 py-12 text-center">
+            <MessageCircle size={28} className="mx-auto mb-3 text-white/20" />
+            <p className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+              У вас пока нет отзывов
+            </p>
+            <p className="mt-1 text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+              Оставить отзыв можно на странице отзывов.
+            </p>
+          </div>
+        )}
+
+        {!loading && reviews.map((review, index) => {
+          const isEditing = editingId === review.id;
+          const selectedEditGame = games.find((game) => game.id === editGameId);
+          const accent = isEditing
+            ? selectedEditGame?.color ?? review.gameColor ?? "#B47AFF"
+            : review.gameColor ?? "#B47AFF";
+
+          return (
+            <motion.div
+              key={review.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.05 }}
+              className="flex flex-col gap-4 border-b border-white/[0.03] px-5 py-4 last:border-0"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+                <div
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm"
+                  style={{
+                    background: `${accent}18`,
+                    border: `1px solid ${accent}30`,
+                    color: accent,
+                    fontWeight: 800,
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                >
+                  {review.avatar || review.name?.slice(0, 2).toUpperCase() || "EC"}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+                      {isEditing ? selectedEditGame?.name ?? review.game : review.game}
+                    </span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[11px]"
+                      style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.35)", fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+                    >
+                      {formatDate(review.createdAt)}
+                    </span>
+                  </div>
+
+                  {!isEditing && (
+                    <>
+                      <div className="mb-3 flex gap-1">
+                        {Array.from({ length: 5 }).map((_, starIndex) => {
+                          const filled = starIndex < review.stars;
+                          return (
+                            <Star
+                              key={starIndex}
+                              size={14}
+                              style={{ color: filled ? accent : "rgba(255,255,255,0.14)" }}
+                              fill={filled ? accent : "transparent"}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      <p className="text-white/55 text-sm leading-relaxed" style={{ fontFamily: "Inter, sans-serif" }}>
+                        {review.text}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {!isEditing && (
+                  <div className="flex flex-wrap gap-2">
+                    <motion.button
+                      type="button"
+                      onClick={() => startEdit(review)}
+                      className="inline-flex h-9 w-fit items-center gap-2 rounded-xl px-3 text-xs text-white/70 transition-colors"
+                      style={{ background: "rgba(180,122,255,0.1)", border: "1px solid rgba(180,122,255,0.18)", fontFamily: "Inter, sans-serif", fontWeight: 700 }}
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
+                    >
+                      <Edit3 size={13} />
+                      Изменить
+                    </motion.button>
+
+                    <motion.button
+                      type="button"
+                      onClick={() => handleDelete(review.id)}
+                      disabled={deletingId === review.id}
+                      className="inline-flex h-9 w-fit items-center gap-2 rounded-xl px-3 text-xs text-red-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ background: "rgba(255,138,138,0.08)", border: "1px solid rgba(255,138,138,0.16)", fontFamily: "Inter, sans-serif", fontWeight: 700 }}
+                      whileHover={deletingId === review.id ? undefined : { scale: 1.04 }}
+                      whileTap={deletingId === review.id ? undefined : { scale: 0.96 }}
+                    >
+                      <Trash2 size={13} />
+                      {deletingId === review.id ? "Удаление" : "Удалить"}
+                    </motion.button>
+                  </div>
+                )}
+              </div>
+
+              {isEditing && (
+                <div
+                  className="rounded-2xl p-4"
+                  style={{
+                    background: "rgba(8,8,14,0.46)",
+                    border: `1px solid ${accent}24`,
+                    boxShadow: `0 0 24px ${accent}10`,
+                  }}
+                >
+                  <div className="grid gap-4 md:grid-cols-[0.8fr_1.2fr]">
+                    <GameReviewSelect
+                      games={games}
+                      value={editGameId}
+                      onChange={setEditGameId}
+                    />
+
+                    <div className="flex flex-col gap-2">
+                      <span className="text-xs text-white/35" style={{ fontWeight: 700 }}>
+                        Оценка
+                      </span>
+                      <div className="flex h-12 items-center gap-1 rounded-xl px-3" style={{ background: "rgba(8,8,14,0.55)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        {Array.from({ length: 5 }).map((_, starIndex) => {
+                          const value = starIndex + 1;
+                          const filled = value <= editStars;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setEditStars(value)}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06]"
+                              aria-label={`Оценка ${value}`}
+                            >
+                              <Star
+                                size={18}
+                                style={{ color: filled ? accent : "rgba(255,255,255,0.18)" }}
+                                fill={filled ? accent : "transparent"}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="mt-4 flex flex-col gap-2">
+                    <span className="text-xs text-white/35" style={{ fontWeight: 700 }}>
+                      Текст отзыва
+                    </span>
+                    <textarea
+                      value={editText}
+                      onChange={(event) => setEditText(event.target.value)}
+                      rows={4}
+                      className="resize-none rounded-xl px-4 py-3 text-sm text-white outline-none placeholder:text-white/20"
+                      style={{
+                        background: "rgba(8,8,14,0.55)",
+                        border: "1px solid rgba(255,255,255,0.09)",
+                        lineHeight: 1.55,
+                        fontFamily: "Inter, sans-serif",
+                      }}
+                    />
+                  </label>
+
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="h-10 rounded-xl px-4 text-sm text-white/45 transition-colors hover:text-white/70"
+                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", fontFamily: "Inter, sans-serif", fontWeight: 700 }}
+                    >
+                      Отмена
+                    </button>
+
+                    <motion.button
+                      type="button"
+                      onClick={() => handleSave(review)}
+                      disabled={savingId === review.id}
+                      className="inline-flex h-10 items-center gap-2 rounded-xl px-4 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      style={{ background: `${accent}28`, border: `1px solid ${accent}44`, fontFamily: "Inter, sans-serif", fontWeight: 800 }}
+                      whileHover={savingId === review.id ? undefined : { scale: 1.03 }}
+                      whileTap={savingId === review.id ? undefined : { scale: 0.97 }}
+                    >
+                      <Check size={14} />
+                      {savingId === review.id ? "Сохранение" : "Сохранить"}
+                    </motion.button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
 function SettingsTab({ user }: { user: UserProfile }) {
@@ -762,11 +1127,51 @@ function SettingsTab({ user }: { user: UserProfile }) {
 // ─── Moderation Tab ───────────────────────────────────────────────────────────
 
 function ModerationTab() {
+  const [reviews, setReviews] = useState<ReviewApi[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
+  const [deletingReviewId, setDeletingReviewId] = useState<number | string | null>(null);
   const reports = [
     { id: "#REP-221", user: "NightWolf", reason: "Спам в отзывах", date: "14 апр", status: "open" },
     { id: "#REP-219", user: "spam_acc_44", reason: "Подозрительная активность", date: "13 апр", status: "open" },
     { id: "#REP-217", user: "ProGamer2000", reason: "Нарушение правил", date: "12 апр", status: "resolved" },
   ];
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchReviews().then((result) => {
+      if (!mounted) return;
+
+      if (result.ok) {
+        setReviews(result.data);
+        setReviewsError(null);
+      } else {
+        setReviewsError(result.error);
+      }
+
+      setReviewsLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  async function handleDeleteReview(id: number | string) {
+    setDeletingReviewId(id);
+    setReviewsError(null);
+
+    const result = await deleteReview(id);
+    setDeletingReviewId(null);
+
+    if (!result.ok) {
+      setReviewsError(result.error);
+      return;
+    }
+
+    setReviews((current) => current.filter((review) => review.id !== id));
+  }
 
   return (
     <motion.div
@@ -838,6 +1243,123 @@ function ModerationTab() {
             )}
           </motion.div>
         ))}
+      </div>
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="flex flex-col gap-2 px-5 py-4 border-b border-white/5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+              Отзывы пользователей
+            </h3>
+            <p className="mt-1 text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+              Администраторы и модераторы могут удалить любой опубликованный отзыв.
+            </p>
+          </div>
+          <span
+            className="w-fit rounded-full px-3 py-1 text-xs"
+            style={{ background: "rgba(180,122,255,0.12)", color: "#B47AFF", fontWeight: 700, fontFamily: "Inter, sans-serif" }}
+          >
+            {reviews.length} отзывов
+          </span>
+        </div>
+
+        {reviewsError && (
+          <div
+            className="mx-5 mt-4 rounded-xl px-4 py-3 text-sm text-red-200"
+            style={{ background: "rgba(255,138,138,0.08)", border: "1px solid rgba(255,138,138,0.16)", fontFamily: "Inter, sans-serif" }}
+          >
+            {reviewsError}
+          </div>
+        )}
+
+        {reviewsLoading && (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Загрузка отзывов...
+          </div>
+        )}
+
+        {!reviewsLoading && reviews.length === 0 && (
+          <div className="px-5 py-10 text-center">
+            <MessageCircle size={28} className="mx-auto mb-3 text-white/20" />
+            <p className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+              Отзывов пока нет
+            </p>
+          </div>
+        )}
+
+        {!reviewsLoading && reviews.map((review, index) => {
+          const accent = review.gameColor ?? "#B47AFF";
+          return (
+            <motion.div
+              key={review.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.04 }}
+              className="flex flex-col gap-4 px-5 py-4 border-b border-white/[0.03] last:border-0 lg:flex-row lg:items-start"
+            >
+              <div
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm"
+                style={{
+                  background: `${accent}18`,
+                  border: `1px solid ${accent}30`,
+                  color: accent,
+                  fontWeight: 800,
+                  fontFamily: "Inter, sans-serif",
+                }}
+              >
+                {review.avatar || review.name?.slice(0, 2).toUpperCase() || "EC"}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+                    {review.name || "Пользователь"}
+                  </span>
+                  <span className="text-xs" style={{ color: accent, fontFamily: "Inter, sans-serif", fontWeight: 700 }}>
+                    {review.game}
+                  </span>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[11px]"
+                    style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.35)", fontFamily: "Inter, sans-serif", fontWeight: 600 }}
+                  >
+                    {formatDate(review.createdAt)}
+                  </span>
+                </div>
+
+                <div className="mb-3 flex gap-1">
+                  {Array.from({ length: 5 }).map((_, starIndex) => {
+                    const filled = starIndex < review.stars;
+                    return (
+                      <Star
+                        key={starIndex}
+                        size={14}
+                        style={{ color: filled ? accent : "rgba(255,255,255,0.14)" }}
+                        fill={filled ? accent : "transparent"}
+                      />
+                    );
+                  })}
+                </div>
+
+                <p className="text-white/55 text-sm leading-relaxed" style={{ fontFamily: "Inter, sans-serif" }}>
+                  {review.text}
+                </p>
+              </div>
+
+              <motion.button
+                type="button"
+                onClick={() => handleDeleteReview(review.id)}
+                disabled={deletingReviewId === review.id}
+                className="inline-flex h-9 w-fit items-center gap-2 rounded-xl px-3 text-xs text-red-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ background: "rgba(255,138,138,0.08)", border: "1px solid rgba(255,138,138,0.16)", fontFamily: "Inter, sans-serif", fontWeight: 700 }}
+                whileHover={deletingReviewId === review.id ? undefined : { scale: 1.04 }}
+                whileTap={deletingReviewId === review.id ? undefined : { scale: 0.96 }}
+              >
+                <Trash2 size={13} />
+                {deletingReviewId === review.id ? "Удаление" : "Удалить"}
+              </motion.button>
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
@@ -1224,6 +1746,7 @@ export default function Dashboard() {
             >
               {activeTab === "overview" && <OverviewTab user={profile} orders={mappedOrders} />}
               {activeTab === "orders" && <OrdersTab orders={mappedOrders} />}
+              {activeTab === "reviews" && <MyReviewsTab />}
               {activeTab === "settings" && <SettingsTab user={profile} />}
               {activeTab === "moderation" && (profile.role === "moderator" || profile.role === "admin") && <ModerationTab />}
               {activeTab === "admin" && profile.role === "admin" && <AdminTab />}
