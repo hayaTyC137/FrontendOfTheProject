@@ -1,12 +1,8 @@
 import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
+  createContext, useContext, useEffect,
+  useMemo, useState, type ReactNode,
 } from "react";
-import { apiRequest } from "../../api/client";
+import { apiRequest, setToken, clearToken, getToken } from "../../api/client";
 
 export type Role = "user" | "moderator" | "admin";
 
@@ -30,15 +26,10 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  signIn: (
-    identifier: string,
-    password: string
-  ) => Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }>;
-  signUp: (payload: {
-    username: string;
-    email: string;
-    password: string;
-  }) => Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }>;
+  signIn: (identifier: string, password: string) =>
+    Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }>;
+  signUp: (payload: { username: string; email: string; password: string }) =>
+    Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
 }
 
@@ -48,74 +39,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // При старте приложения проверяем есть ли активная сессия
+  // При старте проверяем токен
   useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
     apiRequest<AuthUser>("/api/auth/me").then((res) => {
-      if (res.ok && res.data) {
-        setUser(res.data);
-      }
+      if (res.ok && res.data) setUser(res.data);
+      else clearToken(); // токен невалиден — удаляем
       setIsLoading(false);
     });
   }, []);
 
   async function signIn(identifier: string, password: string) {
-    const res = await apiRequest<AuthUser>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ identifier, password }),
-    });
+    const res = await apiRequest<{ token: string; user: AuthUser }>(
+      "/api/auth/login",
+      { method: "POST", body: JSON.stringify({ identifier, password }) }
+    );
 
-    if (!res.ok || !res.data) {
+    if (!res.ok || !res.data)
       return { ok: false as const, error: res.error ?? "Ошибка входа" };
-    }
 
-    setUser(res.data);
-    return { ok: true as const, user: res.data };
+    setToken(res.data.token);
+    setUser(res.data.user);
+    return { ok: true as const, user: res.data.user };
   }
 
   async function signUp(payload: {
-    username: string;
-    email: string;
-    password: string;
+    username: string; email: string; password: string;
   }) {
-    const res = await apiRequest<AuthUser>("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    const res = await apiRequest<{ token: string; user: AuthUser }>(
+      "/api/auth/register",
+      { method: "POST", body: JSON.stringify(payload) }
+    );
 
-    if (!res.ok || !res.data) {
+    if (!res.ok || !res.data)
       return { ok: false as const, error: res.error ?? "Ошибка регистрации" };
-    }
 
-    setUser(res.data);
-    return { ok: true as const, user: res.data };
+    setToken(res.data.token);
+    setUser(res.data.user);
+    return { ok: true as const, user: res.data.user };
   }
 
   async function signOut() {
     await apiRequest("/api/auth/logout", { method: "POST" });
+    clearToken();
     setUser(null);
   }
 
   const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      isAuthenticated: !!user,
-      isLoading,
-      signIn,
-      signUp,
-      signOut,
-    }),
+    () => ({ user, isAuthenticated: !!user, isLoading, signIn, signUp, signOut }),
     [user, isLoading]
   );
 
-  return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 }
