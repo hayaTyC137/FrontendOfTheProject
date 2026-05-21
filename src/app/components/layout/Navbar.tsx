@@ -1,20 +1,17 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ShoppingCart, User, ChevronDown, Zap, Search } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { fetchGames, type GameApi } from "../../../api/games";
+import { games as fallbackGames } from "../../../data/packages";
 
-const games = [
-  { id: "valorant", name: "Valorant", color: "#FF8A8A", currency: "Valorant Points" },
-  { id: "clashroyale", name: "Clash Royale", color: "#7ABAFF", currency: "Gems" },
-  { id: "fortnite", name: "Fortnite", color: "#B47AFF", currency: "V-Bucks" },
-  { id: "apex", name: "Apex Legends", color: "#FFB07A", currency: "Apex Coins" },
-];
+type NavGame = Pick<GameApi, "id" | "name" | "color" | "currency">;
 
 const navItems = ["Главная", "Каталог", "Отзывы", "FAQ", "Контакты"];
 
 interface NavbarProps {
-  onSelectGame: (gameId: string) => void;
+  onSelectGame?: (gameId: string) => void;
   cartCount: number;
 }
 
@@ -23,35 +20,107 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [games, setGames] = useState<NavGame[]>(() =>
+    fallbackGames.map((game) => ({
+      id: game.id,
+      name: game.name,
+      color: game.color,
+      currency: game.currency,
+    })),
+  );
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, signOut } = useAuth();
 
   const filteredGames = searchQuery.trim()
     ? games.filter((game) => {
         const query = searchQuery.toLowerCase();
-        return (
-          game.name.toLowerCase().includes(query) ||
-          game.currency.toLowerCase().includes(query)
-        );
+        return game.name.toLowerCase().startsWith(query);
       })
     : [];
 
+  useEffect(() => {
+    let mounted = true;
+
+    fetchGames().then((apiGames) => {
+      if (!mounted || apiGames.length === 0) return;
+
+      const fallbackById = Object.fromEntries(
+        fallbackGames.map((game) => [game.id, game]),
+      );
+
+      setGames(
+        apiGames.map((game) => {
+          const fallback = fallbackById[game.id];
+          return {
+            id: game.id,
+            name: game.name || fallback?.name || game.id,
+            color: game.color || fallback?.color || "#B47AFF",
+            currency: game.currency || fallback?.currency || "Игровая валюта",
+          };
+        }),
+      );
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   function handleSearchSelect(gameId: string) {
-    onSelectGame(gameId);
+    if (location.pathname === "/" && onSelectGame) {
+      onSelectGame(gameId);
+    } else {
+      navigate({
+        pathname: "/",
+        search: `?game=${encodeURIComponent(gameId)}`,
+        hash: "#catalog",
+      });
+    }
     setSearchQuery("");
     setSearchFocused(false);
   }
 
+  function scrollToCatalogOnHome() {
+    document.getElementById("catalog-section")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }
+
   function handleNavClick(item: string) {
+    if (item === "Главная") {
+      if (location.pathname === "/") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        navigate("/");
+      }
+      return;
+    }
+
+    if (item === "Каталог") {
+      if (location.pathname === "/") {
+        scrollToCatalogOnHome();
+      } else {
+        navigate({ pathname: "/", hash: "#catalog" });
+      }
+      return;
+    }
+
     if (item === "Отзывы") {
       navigate("/reviews");
       return;
     }
 
-    if (item === "Главная") {
-      navigate("/");
+    if (item === "FAQ") {
+      navigate("/faq");
+      return;
+    }
+
+    if (item === "Контакты") {
+      navigate("/contacts");
     }
   }
 
@@ -259,7 +328,7 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
                   <motion.button
                     key={game.id}
                     onClick={() => {
-                      onSelectGame(game.id);
+                      handleSearchSelect(game.id);
                       setDropdownOpen(false);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all"

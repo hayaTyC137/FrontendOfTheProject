@@ -57,6 +57,7 @@ export const Products = forwardRef<HTMLElement, ProductsProps>(
 
     return (
       <section
+        id="catalog-section"
         ref={ref as React.RefObject<HTMLElement>}
         className="relative py-24 px-6"
         style={{

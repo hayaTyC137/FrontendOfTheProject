@@ -3,6 +3,7 @@ import { ArrowRight, Shield, Zap, Clock } from "lucide-react";
 
 interface HeroProps {
   onCTA: () => void;
+  onLearnMore: () => void;
 }
 
 const features = [
@@ -11,7 +12,7 @@ const features = [
   { icon: Clock, label: "Поддержка 24/7", color: "#FFB07A" },
 ];
 
-export function Hero({ onCTA }: HeroProps) {
+export function Hero({ onCTA, onLearnMore }: HeroProps) {
   return (
     <section
       className="relative min-h-screen flex flex-col items-center justify-center text-center px-6 pb-5 overflow-hidden"
@@ -148,6 +149,7 @@ export function Hero({ onCTA }: HeroProps) {
         </motion.button>
 
         <motion.button
+          onClick={onLearnMore}
           className="flex items-center gap-2 px-7 py-3.5 rounded-xl text-white/70 text-sm hover:text-white transition-colors"
           style={{
             fontFamily: "Inter, sans-serif",

@@ -1,7 +1,8 @@
-import { useRef, useState, useCallback } from "react";
-import { Routes, Route, Navigate } from "react-router";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router";
 import { Navbar } from "./app/components/layout/Navbar";
 import { Hero } from "./app/pages/Hero";
+import { AboutSection } from "./app/pages/AboutSection";
 import { GameSelector } from "./app/pages/GameSelector";
 import { Products } from "./app/pages/Products";
 import { Stats } from "./app/pages/Stats";
@@ -12,6 +13,8 @@ import { Register } from "./app/pages/register";
 import { ProductPage } from "./app/pages/ProductPage";
 import { CartPage } from "./app/pages/CartPage";
 import { ReviewsPage } from "./app/pages/ReviewsPage";
+import { FaqPage } from "./app/pages/FaqPage";
+import { ContactsPage } from "./app/pages/ContactsPage";
 import Dashboard from "./app/pages/DashBoard";
 import { useAuth } from "./app/context/AuthContext";
 import { useCart } from "./app/context/CartContext";
@@ -19,8 +22,10 @@ import { useCart } from "./app/context/CartContext";
 function Home() {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const { totalCount } = useCart();
+  const location = useLocation();
 
   const gameSectionRef = useRef<HTMLElement>(null);
+  const aboutSectionRef = useRef<HTMLElement>(null);
   const productsSectionRef = useRef<HTMLElement>(null);
 
   const handleSelectGame = useCallback((gameId: string) => {
@@ -34,6 +39,31 @@ function Home() {
     gameSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const handleLearnMore = useCallback(() => {
+    aboutSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const gameId = params.get("game");
+
+    if (gameId) {
+      setSelectedGame((current) => (current === gameId ? current : gameId));
+    }
+
+    if (location.hash === "#catalog") {
+      requestAnimationFrame(() => {
+        productsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    if (location.hash === "#about") {
+      requestAnimationFrame(() => {
+        aboutSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [location.hash, location.search]);
+
   return (
     <div
       style={{
@@ -44,7 +74,10 @@ function Home() {
       }}
     >
       <Navbar onSelectGame={handleSelectGame} cartCount={totalCount} />
-      <Hero onCTA={handleCTA} />
+      <Hero onCTA={handleCTA} onLearnMore={handleLearnMore} />
+      <div ref={aboutSectionRef as React.RefObject<HTMLDivElement>}>
+        <AboutSection />
+      </div>
       <Stats />
       <GameSelector ref={gameSectionRef} selectedGame={selectedGame} onSelect={handleSelectGame} />
       <Products ref={productsSectionRef} selectedGame={selectedGame} />
@@ -73,6 +106,8 @@ export default function App() {
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route path="/reviews" element={<ReviewsPage />} />
+      <Route path="/faq" element={<FaqPage />} />
+      <Route path="/contacts" element={<ContactsPage />} />
       <Route path="/dashboard" element={<DashboardRoute />} />
     </Routes>
   );

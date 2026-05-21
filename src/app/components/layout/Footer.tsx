@@ -1,11 +1,12 @@
 import { motion } from "motion/react";
 import { Zap, Heart } from "lucide-react";
 import { RiTelegram2Line, RiVkLine, RiDiscordLine } from "react-icons/ri";
+import { useNavigate } from "react-router";
 
 const links = {
   Услуги: ["Valorant Points", "Gems CR", "V-Bucks", "Apex Coins"],
-  Компания: ["О нас", "Отзывы", "FAQ", "Блог", "Вакансии"],
-  Поддержка: ["Контакты", "Гарантии", "Возврат", "Telegram"],
+  Компания: ["О нас", "Отзывы", "FAQ"],
+  Поддержка: ["Контакты", "Telegram"],
 };
 
 const socialLinks = [
@@ -14,7 +15,21 @@ const socialLinks = [
   { id: "ds", href: "https://discord.gg/your_invite", label: "Discord", icon: RiDiscordLine },
 ];
 
+const footerLinkActions = {
+  "Valorant Points": { type: "internal", pathname: "/", search: "?game=valorant", hash: "#catalog" },
+  "Gems CR": { type: "internal", pathname: "/", search: "?game=clashroyale", hash: "#catalog" },
+  "V-Bucks": { type: "internal", pathname: "/", search: "?game=fortnite", hash: "#catalog" },
+  "Apex Coins": { type: "internal", pathname: "/", search: "?game=apex", hash: "#catalog" },
+  "О нас": { type: "internal", pathname: "/", hash: "#about" },
+  "Отзывы": { type: "internal", pathname: "/reviews" },
+  "FAQ": { type: "internal", pathname: "/faq" },
+  "Контакты": { type: "internal", pathname: "/contacts" },
+  "Telegram": { type: "external", href: "https://t.me/your_channel" },
+} as const;
+
 export function Footer() {
+  const navigate = useNavigate();
+
   return (
     <footer
       className="relative pt-16 pb-8 px-6"
@@ -101,15 +116,55 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {items.map((item) => (
                   <li key={item}>
-                    <motion.a
-                      href={item === "Отзывы" ? "/reviews" : "#"}
-                      className="text-white/35 hover:text-white/75 text-sm transition-colors"
-                      style={{ fontFamily: "Inter, sans-serif" }}
-                      whileHover={{ x: 3 }}
-                      transition={{ type: "spring", stiffness: 400 }}
-                    >
-                      {item}
-                    </motion.a>
+                    {(() => {
+                      const action = footerLinkActions[item as keyof typeof footerLinkActions];
+
+                      if (!action) {
+                        return (
+                          <span
+                            className="text-white/22 text-sm"
+                            style={{ fontFamily: "Inter, sans-serif" }}
+                          >
+                            {item}
+                          </span>
+                        );
+                      }
+
+                      if (action.type === "external") {
+                        return (
+                          <motion.a
+                            href={action.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-white/35 hover:text-white/75 text-sm transition-colors"
+                            style={{ fontFamily: "Inter, sans-serif" }}
+                            whileHover={{ x: 3 }}
+                            transition={{ type: "spring", stiffness: 400 }}
+                          >
+                            {item}
+                          </motion.a>
+                        );
+                      }
+
+                      return (
+                        <motion.button
+                          type="button"
+                          onClick={() =>
+                            navigate({
+                              pathname: action.pathname,
+                              search: action.search ?? "",
+                              hash: action.hash ?? "",
+                            })
+                          }
+                          className="text-white/35 hover:text-white/75 text-sm transition-colors"
+                          style={{ fontFamily: "Inter, sans-serif" }}
+                          whileHover={{ x: 3 }}
+                          transition={{ type: "spring", stiffness: 400 }}
+                        >
+                          {item}
+                        </motion.button>
+                      );
+                    })()}
                   </li>
                 ))}
               </ul>
