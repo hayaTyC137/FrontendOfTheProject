@@ -13,6 +13,8 @@ interface ProductsProps {
 type GameView = GameApi & {
   colorDim?: string;
   colorGlow?: string;
+  productIconClass?: string;
+  usedFor?: string[];
 };
 
 export const Products = forwardRef<HTMLElement, ProductsProps>(
@@ -30,11 +32,10 @@ export const Products = forwardRef<HTMLElement, ProductsProps>(
         return;
       }
 
-      const uiGame = uiGames.find((g) => g.id === selectedGame);
-
       fetchGames().then((apiGames) => {
         const apiGame = apiGames.find((g) => g.id === selectedGame);
-        if (apiGame && uiGame) {
+        if (apiGame) {
+          const uiGame = uiGames.find((g) => g.id === selectedGame);
           setGame({ ...uiGame, ...apiGame });
         }
       });

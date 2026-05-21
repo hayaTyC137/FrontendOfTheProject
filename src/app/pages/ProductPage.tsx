@@ -1,23 +1,103 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { ArrowLeft, ShoppingCart, Zap, Shield, Clock, Star, CheckCircle2 } from "lucide-react";
-import { getPackageById, getPackagesByGame, getGameById } from "../../data/packages";
+import { games as uiGames, type Package } from "../../data/packages";
+import { fetchAllPackages, fetchGames, type GameApi, type PackageApi } from "../../api/games";
 import { renderGameMark } from "../utils/renderGameMark";
 import { useCart } from "../context/CartContext";
+
+type GameView = GameApi & {
+  colorDim?: string;
+  colorGlow?: string;
+  productIconClass?: string;
+  usedFor?: string[];
+};
+
+function toCartPackage(pkg: PackageApi): Package {
+  return {
+    id: pkg.id,
+    gameId: pkg.gameId,
+    amount: pkg.amount,
+    label: pkg.label,
+    price: pkg.price,
+    oldPrice: pkg.oldPrice,
+    bonus: pkg.bonus,
+    badge: pkg.badge,
+    popular: pkg.popular,
+  };
+}
+
+function mergeGame(apiGame: GameApi | undefined): GameView | undefined {
+  if (!apiGame) return undefined;
+
+  const uiGame = uiGames.find((g) => g.id === apiGame.id);
+  return {
+    ...uiGame,
+    ...apiGame,
+  };
+}
 
 export function ProductPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addItem } = useCart();
   const [added, setAdded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [product, setProduct] = useState<Package | null>(null);
+  const [game, setGame] = useState<GameView | null>(null);
+  const [similarPackages, setSimilarPackages] = useState<Package[]>([]);
 
-  const product = getPackageById(id ?? "");
-  
-  const game = product ? getGameById(product.gameId) : undefined;
-  const similarPackages = product
-    ? getPackagesByGame(product.gameId).filter((p) => p.id !== product.id)
-    : [];
+  useEffect(() => {
+    let active = true;
+
+    async function loadProduct() {
+      setLoading(true);
+
+      try {
+        const [packages, games] = await Promise.all([fetchAllPackages(), fetchGames()]);
+        if (!active) return;
+
+        const foundProduct = packages.find((pkg) => pkg.id === id);
+        if (!foundProduct) {
+          setProduct(null);
+          setGame(null);
+          setSimilarPackages([]);
+          return;
+        }
+
+        const foundGame = mergeGame(games.find((item) => item.id === foundProduct.gameId));
+        setProduct(toCartPackage(foundProduct));
+        setGame(
+          foundGame ?? {
+            id: foundProduct.gameId,
+            name: foundProduct.gameId,
+            currency: "Currency",
+            abbr: "",
+            color: "#B47AFF",
+            icon: "",
+            description: "Информация о игре недоступна",
+            tag: "Новый",
+            banner: "",
+            about: "Описание игры недоступно.",
+            colorDim: "rgba(180,122,255,0.12)",
+            colorGlow: "rgba(180,122,255,0.25)",
+            productIconClass: "w-12 h-12",
+            usedFor: [],
+          }
+        );
+        setSimilarPackages(packages.filter((pkg) => pkg.gameId === foundProduct.gameId && pkg.id !== foundProduct.id));
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadProduct();
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   function handleAddOnly() {
     if (!product) return;
@@ -30,6 +110,17 @@ export function ProductPage() {
     if (!product) return;
     addItem(product);
     navigate("/cart");
+  }
+
+  if (loading) {
+    return (
+      <div
+        className="min-h-screen flex flex-col items-center justify-center gap-4"
+        style={{ background: "#08080E", fontFamily: "Inter, sans-serif" }}
+      >
+        <p className="text-white/50 text-lg">Загрузка товара...</p>
+      </div>
+    );
   }
 
   if (!product || !game) {
@@ -49,7 +140,10 @@ export function ProductPage() {
       </div>
     );
   }
-  const productIconClass = game.productIconClass;
+  const productIconClass = game.productIconClass ?? "w-12 h-12";
+  const colorDim = game.colorDim ?? `${game.color}1A`;
+  const colorGlow = game.colorGlow ?? `${game.color}40`;
+  const usedFor = game.usedFor ?? [];
 
   return (
     <div
@@ -143,9 +237,9 @@ export function ProductPage() {
             <div
               className="w-32 h-32 rounded-2xl flex items-center justify-center text-6xl"
               style={{
-                background: game.colorDim,
+                background: colorDim,
                 border: `1px solid ${game.color}40`,
-                boxShadow: `0 0 40px ${game.colorGlow}, 0 0 80px ${game.colorGlow}`,
+                boxShadow: `0 0 40px ${colorGlow}, 0 0 80px ${colorGlow}`,
               }}
             >
               {renderGameMark({ icon: game.icon, name: game.name, className: productIconClass })}
@@ -315,14 +409,18 @@ export function ProductPage() {
                 На что потратить
               </h3>
               <div className="flex flex-col gap-2">
-                {game.usedFor.map((item: string) => (
+                {usedFor.length > 0 ? usedFor.map((item: string) => (
                   <div key={item} className="flex items-center gap-2.5">
                     <CheckCircle2 size={14} style={{ color: game.color, flexShrink: 0 }} />
                     <span className="text-sm" style={{ color: "rgba(255,255,255,0.5)", fontWeight: 500 }}>
                       {item}
                     </span>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-sm" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    Описание скоро появится
+                  </p>
+                )}
               </div>
             </div>
 

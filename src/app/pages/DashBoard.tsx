@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
+import { GamesAdminSection } from "../components/GamesAdminSection";
 import {
   User,
   ShoppingBag,
@@ -136,6 +137,7 @@ const navItems: { id: string; label: string; icon: typeof User; roles: Role[] }[
   { id: "reviews", label: "Мои отзывы", icon: MessageCircle, roles: ["user", "moderator", "admin"] },
   { id: "settings", label: "Настройки", icon: Settings, roles: ["user", "moderator", "admin"] },
   { id: "moderation", label: "Модерация", icon: Shield, roles: ["moderator", "admin"] },
+  { id: "catalog", label: "Товары", icon: Package, roles: ["moderator", "admin"] },
   { id: "admin", label: "Панель Админа", icon: Crown, roles: ["admin"] },
 ];
 
@@ -1365,6 +1367,36 @@ function ModerationTab() {
   );
 }
 
+function ProductManagementTab({ role }: { role: Role }) {
+  const isAdmin = role === "admin";
+  const accent = isAdmin ? "#FFB07A" : "#B47AFF";
+  const badgeBg = isAdmin ? "rgba(255,176,122,0.12)" : "rgba(180,122,255,0.12)";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="flex flex-col gap-5"
+    >
+      <div className="flex items-center gap-3">
+        <h2 className="text-white text-lg" style={{ fontWeight: 800, fontFamily: "Inter, sans-serif", letterSpacing: "-0.02em" }}>
+          Управление товарами
+        </h2>
+        <div
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs"
+          style={{ background: badgeBg, color: accent, fontWeight: 600, fontFamily: "Inter, sans-serif" }}
+        >
+          <Package size={11} />
+          {isAdmin ? "Admin access" : "Moderator access"}
+        </div>
+      </div>
+
+      <GamesAdminSection />
+    </motion.div>
+  );
+}
+
 // ─── Admin Tab ────────────────────────────────────────────────────────────────
 
 function AdminTab() {
@@ -1749,6 +1781,7 @@ export default function Dashboard() {
               {activeTab === "reviews" && <MyReviewsTab />}
               {activeTab === "settings" && <SettingsTab user={profile} />}
               {activeTab === "moderation" && (profile.role === "moderator" || profile.role === "admin") && <ModerationTab />}
+              {activeTab === "catalog" && (profile.role === "moderator" || profile.role === "admin") && <ProductManagementTab role={profile.role} />}
               {activeTab === "admin" && profile.role === "admin" && <AdminTab />}
             </motion.div>
           </AnimatePresence>

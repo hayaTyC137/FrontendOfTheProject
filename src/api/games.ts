@@ -39,3 +39,55 @@ export async function fetchAllPackages(): Promise<PackageApi[]> {
   const res = await apiRequest<PackageApi[]>('/api/packages');
   return res.data ?? [];
 }
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+
+export async function createGame(
+  game: GameApi
+): Promise<{ ok: boolean; data?: GameApi; error?: string }> {
+  return apiRequest<GameApi>('/api/games', {
+    method: 'POST',
+    body: JSON.stringify(game),
+  });
+}
+
+export async function updateGame(
+  id: string,
+  game: GameApi
+): Promise<{ ok: boolean; data?: GameApi; error?: string }> {
+  return apiRequest<GameApi>(`/api/games/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(game),
+  });
+}
+
+export async function deleteGame(
+  id: string
+): Promise<{ ok: boolean; error?: string }> {
+  return apiRequest(`/api/games/${id}`, { method: 'DELETE' });
+}
+
+export async function createPackage(
+  pkg: PackageApi
+): Promise<{ ok: boolean; data?: PackageApi; error?: string }> {
+  return apiRequest<PackageApi>('/api/packages', {
+    method: 'POST',
+    body: JSON.stringify(pkg),
+  });
+}
+
+export async function updatePackage(
+  id: string,
+  pkg: PackageApi
+): Promise<{ ok: boolean; data?: PackageApi; error?: string }> {
+  return apiRequest<PackageApi>(`/api/packages/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(pkg),
+  });
+}
+
+export async function deletePackage(
+  id: string
+): Promise<{ ok: boolean; error?: string }> {
+  return apiRequest(`/api/packages/${id}`, { method: 'DELETE' });
+}
