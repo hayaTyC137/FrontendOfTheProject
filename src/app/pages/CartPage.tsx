@@ -7,8 +7,6 @@ import {
 import { useCart } from "../context/CartContext";
 import { renderGameMark } from "../utils/renderGameMark";
 import { useAuth } from "../context/AuthContext";
-import { createOrders } from '../../api/orders';
-import { getGameById } from '../../data/packages';
 
 export function CartPage() {
   const navigate = useNavigate();
@@ -17,32 +15,16 @@ export function CartPage() {
 
   const isEmpty = items.length === 0;
 
-  async function handleCheckout() {
+  function handleCheckout() {
     if (items.length === 0) return;
 
     if (!user) {
       navigate("/login");
       return;
-  }
-    const orderItems = items.map(item => {
-    const game = getGameById(item.pkg.gameId);
-    return {
-      gameName: item.gameName,
-      gameColor: item.gameColor,
-      item: item.pkg.label,
-      amount: `${item.pkg.amount} ${game?.abbr ?? ""}`.trim(),
-      price: item.pkg.price * item.quantity,
-    };
-  });
+    }
 
-  const result = await createOrders(orderItems);
-  if (!result.ok) {
-    console.error("Ошибка создания заказа:", result.error);
-    return;
+    navigate("/checkout");
   }
-  clearCart();
-  navigate("/dashboard");
-}
 
   return (
     <div
@@ -78,7 +60,7 @@ export function CartPage() {
           className="mb-10"
         >
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/#catalog")}
             className="flex items-center gap-2 text-sm mb-6 transition-colors hover:text-white/70"
             style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}
           >

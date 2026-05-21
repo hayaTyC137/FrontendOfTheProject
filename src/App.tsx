@@ -12,6 +12,7 @@ import { Login } from "./app/pages/login";
 import { Register } from "./app/pages/register";
 import { ProductPage } from "./app/pages/ProductPage";
 import { CartPage } from "./app/pages/CartPage";
+import { CheckoutPage } from "./app/pages/CheckoutPage";
 import { ReviewsPage } from "./app/pages/ReviewsPage";
 import { FaqPage } from "./app/pages/FaqPage";
 import { ContactsPage } from "./app/pages/ContactsPage";
@@ -105,6 +106,7 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/product/:id" element={<ProductPage />} />
       <Route path="/cart" element={<CartPage />} />
+      <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/reviews" element={<ReviewsPage />} />
       <Route path="/faq" element={<FaqPage />} />
       <Route path="/contacts" element={<ContactsPage />} />
