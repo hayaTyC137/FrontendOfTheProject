@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { fetchGames, type GameApi } from "../../../api/games";
 import { games as fallbackGames } from "../../../data/packages";
+import { getUserInitials, resolveUserAvatar } from "../../utils/userAvatar";
 
 type NavGame = Pick<GameApi, "id" | "name" | "color" | "currency">;
 
@@ -32,7 +33,7 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, signOut } = useAuth();
+  const { isAuthenticated, signOut, user } = useAuth();
 
   const filteredGames = searchQuery.trim()
     ? games.filter((game) => {
@@ -151,6 +152,8 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
     signOut();
     navigate("/");
   }
+
+  const avatarUrl = resolveUserAvatar(user?.avatarUrl);
 
   return (
     <nav
@@ -375,12 +378,20 @@ export function Navbar({ onSelectGame, cartCount }: NavbarProps) {
         <div className="relative" ref={profileMenuRef}>
           <motion.button
             onClick={() => setProfileMenuOpen((v) => !v)}
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-white/60 hover:text-white transition-colors"
+            className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden text-white/60 hover:text-white transition-colors"
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)" }}
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.93 }}
           >
-            <User size={18} />
+            {avatarUrl ? (
+              <img src={avatarUrl} alt={user?.username ?? "Профиль"} className="h-full w-full object-cover" />
+            ) : isAuthenticated && user ? (
+              <span className="text-sm font-bold text-white" style={{ fontFamily: "Inter, sans-serif" }}>
+                {getUserInitials(user.username)}
+              </span>
+            ) : (
+              <User size={18} />
+            )}
           </motion.button>
 
           <AnimatePresence>

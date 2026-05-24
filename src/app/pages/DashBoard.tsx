@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
 import { GamesAdminSection } from "../components/GamesAdminSection";
@@ -44,6 +44,11 @@ import {
   type UserAdmin,
 } from "../../api/admin";
 import {
+  changeMyPassword,
+  updateMyProfile,
+  uploadMyAvatar,
+} from "../../api/users";
+import {
   deleteReview,
   deleteMyReview,
   fetchReviews,
@@ -53,6 +58,7 @@ import {
 } from "../../api/reviews";
 import { fetchGames, type GameApi } from "../../api/games";
 import { GameReviewSelect } from "../components/GameReviewSelect";
+import { getUserInitials, resolveUserAvatar } from "../utils/userAvatar";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +76,9 @@ interface UserProfile {
   xp: number;
   xpToNext: number;
   verified: boolean;
+  notifyOrders: boolean;
+  notifyPromo: boolean;
+  notifySecurity: boolean;
 }
 
 type Order = {
@@ -99,6 +108,32 @@ const statusConfig = {
   pending: { label: "В обработке", color: "#FFB07A", bg: "rgba(255,176,122,0.1)" },
   failed: { label: "Ошибка", color: "#FF8A8A", bg: "rgba(255,138,138,0.1)" },
 };
+
+function AvatarBox({
+  name,
+  avatar,
+  className,
+  style,
+  fallbackClassName,
+}: {
+  name: string;
+  avatar?: string;
+  className: string;
+  style: CSSProperties;
+  fallbackClassName: string;
+}) {
+  const avatarUrl = resolveUserAvatar(avatar);
+
+  return (
+    <div className={className} style={style}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        <span className={fallbackClassName}>{getUserInitials(name)}</span>
+      )}
+    </div>
+  );
+}
 
 // ─── Background Glows ─────────────────────────────────────────────────────────
 
@@ -172,16 +207,16 @@ function Sidebar({
       <div className="p-6 border-b border-white/5">
         <div className="flex items-start gap-4">
           <div className="relative flex-shrink-0">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold select-none"
+            <AvatarBox
+              name={user.username}
+              avatar={user.avatar}
+              className="w-14 h-14 rounded-2xl flex items-center justify-center overflow-hidden select-none"
               style={{
                 background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
                 boxShadow: "0 0 24px rgba(180,122,255,0.35)",
-                fontFamily: "Inter, sans-serif",
               }}
-            >
-              {user.username[0]}
-            </div>
+              fallbackClassName="text-white text-xl font-bold"
+            />
             {user.verified && (
               <div
                 className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
@@ -745,18 +780,17 @@ function MyReviewsTab() {
               className="flex flex-col gap-4 border-b border-white/[0.03] px-5 py-4 last:border-0"
             >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-                <div
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm"
+                <AvatarBox
+                  name={review.name || "Пользователь"}
+                  avatar={review.avatar}
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl text-sm"
                   style={{
                     background: `${accent}18`,
                     border: `1px solid ${accent}30`,
                     color: accent,
-                    fontWeight: 800,
-                    fontFamily: "Inter, sans-serif",
                   }}
-                >
-                  {review.avatar || review.name?.slice(0, 2).toUpperCase() || "EC"}
-                </div>
+                  fallbackClassName="font-bold"
+                />
 
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -921,11 +955,158 @@ function MyReviewsTab() {
 
 // ─── Settings Tab ─────────────────────────────────────────────────────────────
 
-function SettingsTab({ user }: { user: UserProfile }) {
+function SettingsTab({
+  user,
+  onUserUpdated,
+}: {
+  user: UserProfile;
+  onUserUpdated: (user: AuthUser) => void;
+}) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passVisible, setPassVisible] = useState(false);
-  const [notifications, setNotifications] = useState({ orders: true, promo: false, security: true });
+  const [username, setUsername] = useState(user.username);
+  const [notifications, setNotifications] = useState({
+    orders: user.notifyOrders,
+    promo: user.notifyPromo,
+    security: user.notifySecurity,
+  });
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [avatarMessage, setAvatarMessage] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setUsername(user.username);
+    setNotifications({
+      orders: user.notifyOrders,
+      promo: user.notifyPromo,
+      security: user.notifySecurity,
+    });
+  }, [user.username, user.notifyOrders, user.notifyPromo, user.notifySecurity]);
+
+  async function handleSaveProfile() {
+    const trimmedUsername = username.trim();
+
+    if (trimmedUsername.length < 3 || trimmedUsername.length > 24) {
+      setProfileError("Никнейм должен быть длиной от 3 до 24 символов");
+      setProfileMessage(null);
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileError(null);
+    setProfileMessage(null);
+
+    const result = await updateMyProfile({
+      username: trimmedUsername,
+      notifyOrders: notifications.orders,
+      notifyPromo: notifications.promo,
+      notifySecurity: notifications.security,
+    });
+
+    setIsSavingProfile(false);
+
+    if (!result.ok) {
+      setProfileError(result.error);
+      return;
+    }
+
+    onUserUpdated(result.data);
+    setUsername(result.data.username);
+    setNotifications({
+      orders: result.data.notifyOrders,
+      promo: result.data.notifyPromo,
+      security: result.data.notifySecurity,
+    });
+    setProfileMessage("Настройки профиля сохранены");
+  }
+
+  async function handleSavePassword() {
+    if (!currentPassword.trim() || !newPassword.trim()) {
+      setPasswordError("Заполните текущий и новый пароль");
+      setPasswordMessage(null);
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError("Новый пароль должен содержать минимум 8 символов");
+      setPasswordMessage(null);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Подтверждение пароля не совпадает");
+      setPasswordMessage(null);
+      return;
+    }
+
+    setIsSavingPassword(true);
+    setPasswordError(null);
+    setPasswordMessage(null);
+
+    const result = await changeMyPassword({
+      currentPassword,
+      newPassword,
+    });
+
+    setIsSavingPassword(false);
+
+    if (!result.ok) {
+      setPasswordError(result.error);
+      return;
+    }
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordMessage(result.message ?? "Пароль обновлён");
+  }
+
+  async function handleAvatarSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setAvatarError("Разрешены только PNG, JPG, JPEG и WEBP");
+      setAvatarMessage(null);
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setAvatarError("Размер файла не должен превышать 2 МБ");
+      setAvatarMessage(null);
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setAvatarError(null);
+    setAvatarMessage(null);
+
+    const result = await uploadMyAvatar(file);
+    setIsUploadingAvatar(false);
+
+    if (!result.ok) {
+      setAvatarError(result.error);
+      return;
+    }
+
+    onUserUpdated(result.data);
+    setAvatarMessage("Аватар обновлён");
+  }
 
   return (
     <motion.div
@@ -938,7 +1119,6 @@ function SettingsTab({ user }: { user: UserProfile }) {
         Настройки
       </h2>
 
-      {/* Profile section */}
       <div className="w-full min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
           <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
@@ -946,40 +1126,58 @@ function SettingsTab({ user }: { user: UserProfile }) {
           </h3>
         </div>
         <div className="p-5 flex flex-col gap-4">
-          {/* Avatar */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
+            <AvatarBox
+              name={user.username}
+              avatar={user.avatar}
+              className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden flex-shrink-0"
               style={{
                 background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
                 boxShadow: "0 0 24px rgba(180,122,255,0.3)",
-                fontFamily: "Inter, sans-serif",
               }}
-            >
-              {user.username[0]}
-            </div>
+              fallbackClassName="text-white text-2xl font-bold"
+            />
             <div className="min-w-0">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp"
+                className="hidden"
+                onChange={handleAvatarSelected}
+              />
               <motion.button
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white/70"
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-white/70 disabled:cursor-not-allowed disabled:opacity-60"
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   border: "1px solid rgba(255,255,255,0.1)",
                   fontFamily: "Inter, sans-serif",
                   fontWeight: 600,
                 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
+                whileHover={isUploadingAvatar ? undefined : { scale: 1.02 }}
+                whileTap={isUploadingAvatar ? undefined : { scale: 0.97 }}
               >
                 <Edit3 size={13} />
-                Изменить аватар
+                {isUploadingAvatar ? "Загрузка..." : "Изменить аватар"}
               </motion.button>
               <p className="text-white/25 text-xs mt-1.5" style={{ fontFamily: "Inter, sans-serif" }}>
-                PNG, JPG до 2MB
+                PNG, JPG, WEBP до 2MB
               </p>
+              {avatarError && (
+                <p className="text-red-300 text-xs mt-2" style={{ fontFamily: "Inter, sans-serif" }}>
+                  {avatarError}
+                </p>
+              )}
+              {avatarMessage && (
+                <p className="text-emerald-300 text-xs mt-2" style={{ fontFamily: "Inter, sans-serif" }}>
+                  {avatarMessage}
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Fields */}
           <div className="grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2">
             <div className="min-w-0">
               <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
@@ -992,7 +1190,8 @@ function SettingsTab({ user }: { user: UserProfile }) {
                   style={{ color: usernameFocused ? "#B47AFF" : "rgba(255,255,255,0.25)" }}
                 />
                 <input
-                  defaultValue={user.username}
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
                   onFocus={() => setUsernameFocused(true)}
                   onBlur={() => setUsernameFocused(false)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl text-white text-sm outline-none transition-all"
@@ -1016,10 +1215,11 @@ function SettingsTab({ user }: { user: UserProfile }) {
                   style={{ color: emailFocused ? "#B47AFF" : "rgba(255,255,255,0.25)" }}
                 />
                 <input
-                  defaultValue={user.email}
+                  value={user.email}
+                  readOnly
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl text-white text-sm outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl text-white/70 text-sm outline-none transition-all"
                   style={{
                     background: "rgba(255,255,255,0.05)",
                     border: emailFocused ? "1px solid rgba(180,122,255,0.5)" : "1px solid rgba(255,255,255,0.08)",
@@ -1028,64 +1228,163 @@ function SettingsTab({ user }: { user: UserProfile }) {
                   }}
                 />
               </div>
+              <p className="text-white/25 text-xs mt-1.5" style={{ fontFamily: "Inter, sans-serif" }}>
+                Смена email пока недоступна
+              </p>
             </div>
           </div>
 
+          {profileError && (
+            <p className="text-red-300 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+              {profileError}
+            </p>
+          )}
+          {profileMessage && (
+            <p className="text-emerald-300 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+              {profileMessage}
+            </p>
+          )}
+
           <motion.button
-            className="self-start px-5 py-2.5 rounded-xl text-white text-sm"
+            type="button"
+            onClick={handleSaveProfile}
+            disabled={isSavingProfile}
+            className="self-start px-5 py-2.5 rounded-xl text-white text-sm disabled:cursor-not-allowed disabled:opacity-60"
             style={{
               background: "linear-gradient(135deg, #B47AFF 0%, #FF8A8A 100%)",
               boxShadow: "0 0 20px rgba(180,122,255,0.25)",
               fontWeight: 700,
               fontFamily: "Inter, sans-serif",
             }}
-            whileHover={{ scale: 1.03, boxShadow: "0 0 32px rgba(180,122,255,0.45)" }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={isSavingProfile ? undefined : { scale: 1.03, boxShadow: "0 0 32px rgba(180,122,255,0.45)" }}
+            whileTap={isSavingProfile ? undefined : { scale: 0.97 }}
           >
-            Сохранить изменения
+            {isSavingProfile ? "Сохранение..." : "Сохранить изменения"}
           </motion.button>
         </div>
       </div>
 
-      {/* Security */}
       <div className="w-full min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
           <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
             Безопасность
           </h3>
         </div>
-        <div className="p-5">
-          <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
-            Новый пароль
-          </label>
-          <div className="relative w-full max-w-sm">
-            <Lock
-              size={14}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: "rgba(255,255,255,0.25)" }}
-            />
-            <input
-              type={passVisible ? "text" : "password"}
-              placeholder="••••••••"
-              className="w-full pl-10 pr-11 py-2.5 rounded-xl text-white text-sm outline-none transition-all"
-              style={{
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                fontFamily: "Inter, sans-serif",
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setPassVisible((v) => !v)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
-            >
-              {passVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-            </button>
+        <div className="p-5 flex flex-col gap-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
+                Текущий пароль
+              </label>
+              <div className="relative">
+                <Lock
+                  size={14}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: "rgba(255,255,255,0.25)" }}
+                />
+                <input
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  type={passVisible ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-11 py-2.5 rounded-xl text-white text-sm outline-none transition-all"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
+                Новый пароль
+              </label>
+              <div className="relative">
+                <Lock
+                  size={14}
+                  className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: "rgba(255,255,255,0.25)" }}
+                />
+                <input
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  type={passVisible ? "text" : "password"}
+                  placeholder="Минимум 8 символов"
+                  className="w-full pl-10 pr-11 py-2.5 rounded-xl text-white text-sm outline-none transition-all"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    fontFamily: "Inter, sans-serif",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setPassVisible((value) => !value)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors"
+                >
+                  {passVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
           </div>
+
+          <div className="w-full max-w-sm">
+            <label className="text-white/50 text-xs mb-1.5 block" style={{ fontFamily: "Inter, sans-serif", fontWeight: 600 }}>
+              Подтверждение нового пароля
+            </label>
+            <div className="relative">
+              <Lock
+                size={14}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                style={{ color: "rgba(255,255,255,0.25)" }}
+              />
+              <input
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                type={passVisible ? "text" : "password"}
+                placeholder="Повторите пароль"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl text-white text-sm outline-none transition-all"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  fontFamily: "Inter, sans-serif",
+                }}
+              />
+            </div>
+          </div>
+
+          {passwordError && (
+            <p className="text-red-300 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+              {passwordError}
+            </p>
+          )}
+          {passwordMessage && (
+            <p className="text-emerald-300 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+              {passwordMessage}
+            </p>
+          )}
+
+          <motion.button
+            type="button"
+            onClick={handleSavePassword}
+            disabled={isSavingPassword}
+            className="self-start px-5 py-2.5 rounded-xl text-white text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              fontWeight: 700,
+              fontFamily: "Inter, sans-serif",
+            }}
+            whileHover={isSavingPassword ? undefined : { scale: 1.03 }}
+            whileTap={isSavingPassword ? undefined : { scale: 0.97 }}
+          >
+            {isSavingPassword ? "Обновление..." : "Обновить пароль"}
+          </motion.button>
         </div>
       </div>
 
-      {/* Notifications */}
       <div className="w-full min-w-0 rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
           <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
@@ -1104,6 +1403,7 @@ function SettingsTab({ user }: { user: UserProfile }) {
                 <p className="truncate text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>{n.desc}</p>
               </div>
               <button
+                type="button"
                 onClick={() => setNotifications((prev) => ({ ...prev, [n.key]: !prev[n.key] }))}
                 className="relative w-11 h-6 rounded-full transition-all flex-shrink-0"
                 style={{
@@ -1299,18 +1599,17 @@ function ModerationTab() {
               transition={{ delay: index * 0.04 }}
               className="flex flex-col gap-4 px-5 py-4 border-b border-white/[0.03] last:border-0 lg:flex-row lg:items-start"
             >
-              <div
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm"
+              <AvatarBox
+                name={review.name || "Пользователь"}
+                avatar={review.avatar}
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl text-sm"
                 style={{
                   background: `${accent}18`,
                   border: `1px solid ${accent}30`,
                   color: accent,
-                  fontWeight: 800,
-                  fontFamily: "Inter, sans-serif",
                 }}
-              >
-                {review.avatar || review.name?.slice(0, 2).toUpperCase() || "EC"}
-              </div>
+                fallbackClassName="font-bold"
+              />
 
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -1658,7 +1957,7 @@ function mapAuthUserToProfile(user: AuthUser): UserProfile {
     id: user.id,
     username: user.username,
     email: user.email,
-    avatar: undefined,
+    avatar: user.avatarUrl,
     role: user.role,
     balance: user.balance,
     totalSpent: user.totalSpent,
@@ -1672,6 +1971,9 @@ function mapAuthUserToProfile(user: AuthUser): UserProfile {
     xp: user.xp,
     xpToNext: user.xpToNext,
     verified: user.verified,
+    notifyOrders: user.notifyOrders,
+    notifyPromo: user.notifyPromo,
+    notifySecurity: user.notifySecurity,
   };
 }
 
@@ -1683,7 +1985,7 @@ function getInitialTabByRole(role: Role) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, signOut, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
   const { orders, ordersCount, totalSpent } = useUserOrders(
   user?.id != null ? String(user.id) : null
@@ -1695,7 +1997,7 @@ export default function Dashboard() {
       return;
     }
     setActiveTab(getInitialTabByRole(user.role));
-  }, [navigate, user]);
+  }, [navigate, user?.id, user?.role]);
 
   if (!user) {
     return null;
@@ -1779,7 +2081,7 @@ export default function Dashboard() {
               {activeTab === "overview" && <OverviewTab user={profile} orders={mappedOrders} />}
               {activeTab === "orders" && <OrdersTab orders={mappedOrders} />}
               {activeTab === "reviews" && <MyReviewsTab />}
-              {activeTab === "settings" && <SettingsTab user={profile} />}
+              {activeTab === "settings" && <SettingsTab user={profile} onUserUpdated={updateUser} />}
               {activeTab === "moderation" && (profile.role === "moderator" || profile.role === "admin") && <ModerationTab />}
               {activeTab === "catalog" && (profile.role === "moderator" || profile.role === "admin") && <ProductManagementTab role={profile.role} />}
               {activeTab === "admin" && profile.role === "admin" && <AdminTab />}

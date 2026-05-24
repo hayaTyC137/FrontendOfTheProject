@@ -10,6 +10,7 @@ export interface AuthUser {
   id: number;
   username: string;
   email: string;
+  avatarUrl: string;
   role: Role;
   balance: number;
   totalSpent: number;
@@ -19,6 +20,9 @@ export interface AuthUser {
   xpToNext: number;
   verified: boolean;
   isBanned: boolean;
+  notifyOrders: boolean;
+  notifyPromo: boolean;
+  notifySecurity: boolean;
   createdAt: string;
 }
 
@@ -31,6 +35,8 @@ interface AuthContextValue {
   signUp: (payload: { username: string; email: string; password: string }) =>
     Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }>;
   signOut: () => Promise<void>;
+  updateUser: (user: AuthUser) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -39,7 +45,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // При старте проверяем токен
+  async function refreshUser() {
+    const res = await apiRequest<AuthUser>("/api/auth/me");
+
+    if (res.ok && res.data) {
+      setUser(res.data);
+      return;
+    }
+
+    clearToken();
+    setUser(null);
+  }
+
+  function updateUser(nextUser: AuthUser) {
+    setUser(nextUser);
+  }
+
   useEffect(() => {
     const token = getToken();
     if (!token) {
@@ -47,9 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    apiRequest<AuthUser>("/api/auth/me").then((res) => {
-      if (res.ok && res.data) setUser(res.data);
-      else clearToken(); // токен невалиден — удаляем
+    refreshUser().finally(() => {
       setIsLoading(false);
     });
   }, []);
@@ -91,7 +110,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isAuthenticated: !!user, isLoading, signIn, signUp, signOut }),
+    () => ({
+      user,
+      isAuthenticated: !!user,
+      isLoading,
+      signIn,
+      signUp,
+      signOut,
+      updateUser,
+      refreshUser,
+    }),
     [user, isLoading]
   );
 

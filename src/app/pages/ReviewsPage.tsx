@@ -19,6 +19,7 @@ import { GameReviewSelect } from "../components/GameReviewSelect";
 import { Footer } from "../components/layout/Footer";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
+import { getUserInitials, resolveUserAvatar } from "../utils/userAvatar";
 
 type ReviewsSource = "api" | "fallback";
 
@@ -65,6 +66,8 @@ function normalizeReview(review: ReviewApi | ReviewView, index: number): ReviewV
 }
 
 function ReviewCard({ review, index }: { review: ReviewView; index: number }) {
+  const avatarUrl = resolveUserAvatar(review.avatar);
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 20 }}
@@ -91,7 +94,7 @@ function ReviewCard({ review, index }: { review: ReviewView; index: number }) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <div
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-sm"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl text-sm"
             style={{
               background: `${review.gameColor}18`,
               border: `1px solid ${review.gameColor}32`,
@@ -100,7 +103,15 @@ function ReviewCard({ review, index }: { review: ReviewView; index: number }) {
               fontWeight: 800,
             }}
           >
-            {review.avatar}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={review.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              review.avatar
+            )}
           </div>
           <div className="min-w-0">
             <h3
@@ -176,6 +187,7 @@ export function ReviewsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const profileAvatarUrl = resolveUserAvatar(user?.avatarUrl);
 
   const loadReviews = useCallback(() => {
     let mounted = true;
@@ -357,10 +369,16 @@ export function ReviewsPage() {
           <button
             type="button"
             onClick={() => navigate(isAuthenticated ? "/dashboard" : "/login")}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-white/60 transition-colors hover:text-white"
+            className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl text-white/60 transition-colors hover:text-white"
             style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.09)" }}
           >
-            <User size={18} />
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt={user?.username ?? "Профиль"} className="h-full w-full object-cover" />
+            ) : isAuthenticated && user ? (
+              <span className="text-sm font-bold text-white">{getUserInitials(user.username)}</span>
+            ) : (
+              <User size={18} />
+            )}
           </button>
         </div>
       </header>
