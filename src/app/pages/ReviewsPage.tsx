@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import {
+  AlertTriangle,
   ArrowLeft,
   Loader2,
   MessageCircle,
@@ -14,6 +15,7 @@ import {
 import { useNavigate } from "react-router";
 import { fetchGames, type GameApi } from "../../api/games";
 import { createReview, fetchReviews, type ReviewApi } from "../../api/reviews";
+import { createReport } from "../../api/reports";
 import { fallbackReviews, type ReviewView } from "../../data/reviews";
 import { GameReviewSelect } from "../components/GameReviewSelect";
 import { Footer } from "../components/layout/Footer";
@@ -22,6 +24,10 @@ import { useCart } from "../context/CartContext";
 import { getUserInitials, resolveUserAvatar } from "../utils/userAvatar";
 
 type ReviewsSource = "api" | "fallback";
+
+type ReviewCardView = ReviewView & {
+  userId?: number | null;
+};
 
 function clampStars(value: number) {
   if (!Number.isFinite(value)) return 5;
@@ -50,11 +56,12 @@ function formatReviewDate(createdAt?: string) {
   });
 }
 
-function normalizeReview(review: ReviewApi | ReviewView, index: number): ReviewView {
+function normalizeReview(review: ReviewApi | ReviewView, index: number): ReviewCardView {
   const name = review.name?.trim() || "Покупатель";
 
   return {
     id: review.id ?? `review-${index}`,
+    userId: "userId" in review ? review.userId : null,
     name,
     game: review.game?.trim() || "EgorkaCoins",
     gameColor: review.gameColor || "#B47AFF",
@@ -65,8 +72,19 @@ function normalizeReview(review: ReviewApi | ReviewView, index: number): ReviewV
   };
 }
 
-function ReviewCard({ review, index }: { review: ReviewView; index: number }) {
+function ReviewCard({
+  review,
+  index,
+  currentUserId,
+  onReport,
+}: {
+  review: ReviewCardView;
+  index: number;
+  currentUserId?: number;
+  onReport: (review: ReviewCardView) => void;
+}) {
   const avatarUrl = resolveUserAvatar(review.avatar);
+  const canReport = !!review.userId && review.userId !== currentUserId;
 
   return (
     <motion.article
@@ -164,9 +182,28 @@ function ReviewCard({ review, index }: { review: ReviewView; index: number }) {
         {review.text}
       </p>
 
-      <div className="flex items-center gap-2 border-t border-white/[0.06] pt-4 text-xs text-white/30">
-        <ShieldCheck size={13} style={{ color: review.gameColor }} />
-        <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}>Проверенный покупатель</span>
+      <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] pt-4 text-xs text-white/30">
+        <div className="flex items-center gap-2">
+          <ShieldCheck size={13} style={{ color: review.gameColor }} />
+          <span style={{ fontFamily: "Inter, sans-serif", fontWeight: 500 }}>Проверенный покупатель</span>
+        </div>
+        {canReport && (
+          <button
+            type="button"
+            onClick={() => onReport(review)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] transition-colors hover:text-white"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.42)",
+              fontFamily: "Inter, sans-serif",
+              fontWeight: 700,
+            }}
+          >
+            <AlertTriangle size={12} />
+            Пожаловаться
+          </button>
+        )}
       </div>
     </motion.article>
   );
@@ -176,7 +213,7 @@ export function ReviewsPage() {
   const navigate = useNavigate();
   const { totalCount } = useCart();
   const { isAuthenticated, user } = useAuth();
-  const [reviews, setReviews] = useState<ReviewView[]>([]);
+  const [reviews, setReviews] = useState<ReviewCardView[]>([]);
   const [source, setSource] = useState<ReviewsSource>("fallback");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +224,11 @@ export function ReviewsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<ReviewCardView | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
   const profileAvatarUrl = resolveUserAvatar(user?.avatarUrl);
 
   const loadReviews = useCallback(() => {
@@ -251,6 +293,18 @@ export function ReviewsPage() {
     setFormOpen(true);
   }
 
+  function handleOpenReport(review: ReviewCardView) {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+
+    setReportTarget(review);
+    setReportReason("");
+    setReportError(null);
+    setReportSuccess(null);
+  }
+
   async function handleCreateReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -288,6 +342,40 @@ export function ReviewsPage() {
     setReviewText("");
     setReviewStars(5);
     setFormOpen(false);
+  }
+
+  async function handleCreateReport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!reportTarget?.userId) {
+      setReportError("Не удалось определить пользователя для жалобы");
+      return;
+    }
+
+    const reason = reportReason.trim();
+    if (reason.length < 5) {
+      setReportError("Опишите жалобу чуть подробнее");
+      return;
+    }
+
+    setReportSubmitting(true);
+    setReportError(null);
+
+    const result = await createReport({
+      reportedUserId: reportTarget.userId,
+      reason,
+    });
+
+    setReportSubmitting(false);
+
+    if (!result.ok) {
+      setReportError(result.error);
+      return;
+    }
+
+    setReportTarget(null);
+    setReportReason("");
+    setReportSuccess(`Жалоба на пользователя ${reportTarget.name} отправлена`);
   }
 
   return (
@@ -589,6 +677,93 @@ export function ReviewsPage() {
           </motion.div>
         )}
 
+        {reportSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 rounded-2xl px-5 py-4 text-sm text-white/60"
+            style={{
+              background: "rgba(74,222,128,0.08)",
+              border: "1px solid rgba(74,222,128,0.16)",
+            }}
+          >
+            {reportSuccess}
+          </motion.div>
+        )}
+
+        {reportTarget && (
+          <motion.form
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            onSubmit={handleCreateReport}
+            className="mb-8 rounded-2xl p-5"
+            style={{
+              background: "rgba(255,255,255,0.035)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 18px 60px rgba(0,0,0,0.28)",
+            }}
+          >
+            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-white text-base" style={{ fontWeight: 800 }}>
+                  Жалоба на {reportTarget.name}
+                </h2>
+                <p className="mt-1 text-xs text-white/35">
+                  Опиши, что именно нарушает правила или выглядит подозрительно.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setReportTarget(null);
+                  setReportReason("");
+                  setReportError(null);
+                }}
+                className="self-start rounded-xl px-3 py-2 text-xs text-white/45 transition-colors hover:text-white/70"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)", fontWeight: 700 }}
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <textarea
+              value={reportReason}
+              onChange={(event) => setReportReason(event.target.value)}
+              rows={4}
+              placeholder="Например: спам, оскорбления, подозрительная активность, обман в отзыве"
+              className="w-full rounded-2xl px-4 py-3 text-sm text-white outline-none resize-none"
+              style={{
+                background: "rgba(8,8,14,0.45)",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            />
+
+            {reportError && (
+              <p className="mt-3 text-sm" style={{ color: "#FF8A8A", fontWeight: 500 }}>
+                {reportError}
+              </p>
+            )}
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <motion.button
+                type="submit"
+                disabled={reportSubmitting}
+                className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: "rgba(255,138,138,0.14)",
+                  border: "1px solid rgba(255,138,138,0.24)",
+                  fontWeight: 800,
+                }}
+                whileHover={reportSubmitting ? undefined : { scale: 1.03 }}
+                whileTap={reportSubmitting ? undefined : { scale: 0.97 }}
+              >
+                {reportSubmitting ? <Loader2 size={15} className="animate-spin" /> : <AlertTriangle size={15} />}
+                Отправить жалобу
+              </motion.button>
+            </div>
+          </motion.form>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleReviews.map((review, index) => (
@@ -597,7 +772,7 @@ export function ReviewsPage() {
                 className="min-h-[260px] animate-pulse rounded-2xl"
                 style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)" }}
               >
-                <ReviewCard review={review} index={index} />
+                <ReviewCard review={review} index={index} currentUserId={user?.id} onReport={handleOpenReport} />
               </div>
             ))}
           </div>
@@ -616,7 +791,13 @@ export function ReviewsPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {visibleReviews.map((review, index) => (
-              <ReviewCard key={review.id} review={review} index={index} />
+              <ReviewCard
+                key={review.id}
+                review={review}
+                index={index}
+                currentUserId={user?.id}
+                onReport={handleOpenReport}
+              />
             ))}
           </div>
         )}

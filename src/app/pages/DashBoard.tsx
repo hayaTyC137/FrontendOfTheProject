@@ -56,6 +56,13 @@ import {
   updateReview,
   type ReviewApi,
 } from "../../api/reviews";
+import {
+  fetchMyReports,
+  fetchReports,
+  updateReportStatus,
+  type ReportApi,
+  type ReportStatus,
+} from "../../api/reports";
 import { fetchGames, type GameApi } from "../../api/games";
 import { GameReviewSelect } from "../components/GameReviewSelect";
 import { getUserInitials, resolveUserAvatar } from "../utils/userAvatar";
@@ -108,6 +115,26 @@ const statusConfig = {
   pending: { label: "В обработке", color: "#FFB07A", bg: "rgba(255,176,122,0.1)" },
   failed: { label: "Ошибка", color: "#FF8A8A", bg: "rgba(255,138,138,0.1)" },
 };
+
+const reportStatusConfig: Record<ReportStatus, { label: string; color: string; bg: string }> = {
+  open: { label: "Открыта", color: "#FFB07A", bg: "rgba(255,176,122,0.1)" },
+  in_review: { label: "На рассмотрении", color: "#B47AFF", bg: "rgba(180,122,255,0.12)" },
+  resolved: { label: "Решена", color: "#4ade80", bg: "rgba(74,222,128,0.1)" },
+  rejected: { label: "Отклонена", color: "#FF8A8A", bg: "rgba(255,138,138,0.1)" },
+};
+
+function formatReportDate(value?: string | null) {
+  if (!value) return "Недавно";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Недавно";
+
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 function AvatarBox({
   name,
@@ -170,6 +197,7 @@ const navItems: { id: string; label: string; icon: typeof User; roles: Role[] }[
   { id: "overview", label: "Обзор", icon: BarChart2, roles: ["user", "moderator", "admin"] },
   { id: "orders", label: "Мои заказы", icon: ShoppingBag, roles: ["user", "moderator", "admin"] },
   { id: "reviews", label: "Мои отзывы", icon: MessageCircle, roles: ["user", "moderator", "admin"] },
+  { id: "reports", label: "Мои жалобы", icon: AlertTriangle, roles: ["user", "moderator", "admin"] },
   { id: "settings", label: "Настройки", icon: Settings, roles: ["user", "moderator", "admin"] },
   { id: "moderation", label: "Модерация", icon: Shield, roles: ["moderator", "admin"] },
   { id: "catalog", label: "Товары", icon: Package, roles: ["moderator", "admin"] },
@@ -1428,31 +1456,180 @@ function SettingsTab({
 
 // ─── Moderation Tab ───────────────────────────────────────────────────────────
 
+function MyReportsTab() {
+  const [reports, setReports] = useState<ReportApi[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchMyReports().then((result) => {
+      if (!mounted) return;
+
+      if (result.ok) {
+        setReports(result.data);
+        setError(null);
+      } else {
+        setError(result.error);
+      }
+
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="flex flex-col gap-5"
+    >
+      <div className="flex items-center gap-3">
+        <h2 className="text-white text-lg" style={{ fontWeight: 800, fontFamily: "Inter, sans-serif", letterSpacing: "-0.02em" }}>
+          Мои жалобы
+        </h2>
+        <span
+          className="text-xs px-3 py-1 rounded-full"
+          style={{ background: "rgba(255,176,122,0.12)", color: "#FFB07A", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
+        >
+          {reports.length} всего
+        </span>
+      </div>
+
+      {error && (
+        <div
+          className="rounded-2xl px-5 py-4 text-sm text-red-200"
+          style={{ background: "rgba(255,138,138,0.08)", border: "1px solid rgba(255,138,138,0.16)", fontFamily: "Inter, sans-serif" }}
+        >
+          {error}
+        </div>
+      )}
+
+      <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="px-5 py-4 border-b border-white/5">
+          <h3 className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+            История обращений
+          </h3>
+        </div>
+
+        {loading && (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Загрузка жалоб...
+          </div>
+        )}
+
+        {!loading && reports.length === 0 && (
+          <div className="px-5 py-10 text-center">
+            <AlertTriangle size={28} className="mx-auto mb-3 text-white/20" />
+            <p className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+              Жалоб пока нет
+            </p>
+            <p className="mt-2 text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+              Если заметите нарушение, сможете пожаловаться на пользователя со страницы отзывов.
+            </p>
+          </div>
+        )}
+
+        {!loading && reports.map((report, index) => {
+          const status = reportStatusConfig[report.status];
+          return (
+            <motion.div
+              key={report.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.05 }}
+              className="flex flex-col gap-3 px-5 py-4 border-b border-white/[0.03] last:border-0"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+                    Жалоба на {report.reportedUsername}
+                  </p>
+                  <p className="mt-1 text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+                    Отправлена {formatReportDate(report.createdAt)}
+                  </p>
+                </div>
+                <span
+                  className="w-fit rounded-full px-2.5 py-1 text-xs"
+                  style={{ background: status.bg, color: status.color, fontWeight: 700, fontFamily: "Inter, sans-serif" }}
+                >
+                  {status.label}
+                </span>
+              </div>
+
+              <div
+                className="rounded-xl px-4 py-3 text-sm text-white/60"
+                style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.06)", fontFamily: "Inter, sans-serif" }}
+              >
+                {report.reason}
+              </div>
+
+              {report.reviewedByUsername && (
+                <p className="text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+                  Рассмотрел: {report.reviewedByUsername}
+                  {report.statusChangedAt ? ` · ${formatReportDate(report.statusChangedAt)}` : ""}
+                </p>
+              )}
+
+              {report.moderatorComment && (
+                <div
+                  className="rounded-xl px-4 py-3 text-sm text-white/65"
+                  style={{ background: "rgba(180,122,255,0.08)", border: "1px solid rgba(180,122,255,0.16)", fontFamily: "Inter, sans-serif" }}
+                >
+                  <p className="mb-1 text-xs text-white/35" style={{ fontWeight: 700 }}>
+                    Комментарий модератора
+                  </p>
+                  {report.moderatorComment}
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
 function ModerationTab() {
   const [reviews, setReviews] = useState<ReviewApi[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [deletingReviewId, setDeletingReviewId] = useState<number | string | null>(null);
-  const reports = [
-    { id: "#REP-221", user: "NightWolf", reason: "Спам в отзывах", date: "14 апр", status: "open" },
-    { id: "#REP-219", user: "spam_acc_44", reason: "Подозрительная активность", date: "13 апр", status: "open" },
-    { id: "#REP-217", user: "ProGamer2000", reason: "Нарушение правил", date: "12 апр", status: "resolved" },
-  ];
+  const [reports, setReports] = useState<ReportApi[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+  const [updatingReportId, setUpdatingReportId] = useState<number | null>(null);
+  const [statusDraftReportId, setStatusDraftReportId] = useState<number | null>(null);
+  const [statusDraft, setStatusDraft] = useState<"resolved" | "rejected">("resolved");
+  const [moderatorComment, setModeratorComment] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
-    fetchReviews().then((result) => {
+    Promise.all([fetchReviews(), fetchReports()]).then(([reviewsResult, reportsResult]) => {
       if (!mounted) return;
 
-      if (result.ok) {
-        setReviews(result.data);
+      if (reviewsResult.ok) {
+        setReviews(reviewsResult.data);
         setReviewsError(null);
       } else {
-        setReviewsError(result.error);
+        setReviewsError(reviewsResult.error);
+      }
+
+      if (reportsResult.ok) {
+        setReports(reportsResult.data);
+        setReportsError(null);
+      } else {
+        setReportsError(reportsResult.error);
       }
 
       setReviewsLoading(false);
+      setReportsLoading(false);
     });
 
     return () => {
@@ -1475,6 +1652,36 @@ function ModerationTab() {
     setReviews((current) => current.filter((review) => review.id !== id));
   }
 
+  async function handleReportStatus(
+    reportId: number,
+    status: "in_review" | "resolved" | "rejected",
+    comment?: string
+  ) {
+    setUpdatingReportId(reportId);
+    setReportsError(null);
+
+    const result = await updateReportStatus(reportId, {
+      status,
+      moderatorComment: comment,
+    });
+
+    setUpdatingReportId(null);
+
+    if (!result.ok) {
+      setReportsError(result.error);
+      return;
+    }
+
+    setReports((current) =>
+      current.map((report) => (report.id === reportId ? result.data : report))
+    );
+
+    setStatusDraftReportId(null);
+    setModeratorComment("");
+  }
+
+  const openReportsCount = reports.filter((report) => report.status === "open").length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -1490,9 +1697,18 @@ function ModerationTab() {
           className="text-xs px-3 py-1 rounded-full"
           style={{ background: "rgba(255,138,138,0.12)", color: "#FF8A8A", fontWeight: 600, fontFamily: "Inter, sans-serif" }}
         >
-          2 открытых жалобы
+          {openReportsCount} открытых жалоб
         </span>
       </div>
+
+      {reportsError && (
+        <div
+          className="rounded-2xl px-5 py-4 text-sm text-red-200"
+          style={{ background: "rgba(255,138,138,0.08)", border: "1px solid rgba(255,138,138,0.16)", fontFamily: "Inter, sans-serif" }}
+        >
+          {reportsError}
+        </div>
+      )}
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
         <div className="px-5 py-4 border-b border-white/5">
@@ -1500,51 +1716,224 @@ function ModerationTab() {
             Жалобы пользователей
           </h3>
         </div>
-        {reports.map((r, i) => (
-          <motion.div
-            key={r.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: i * 0.06 }}
-            className="flex items-center gap-4 px-5 py-3.5 border-b border-white/[0.03] last:border-0"
-          >
-            <AlertTriangle size={16} style={{ color: r.status === "open" ? "#FFB07A" : "rgba(255,255,255,0.2)" }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-sm" style={{ fontWeight: 600, fontFamily: "Inter, sans-serif" }}>
-                {r.user} <span className="text-white/30 font-normal">{r.id}</span>
-              </p>
-              <p className="text-white/40 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
-                {r.reason} · {r.date}
-              </p>
-            </div>
-            <span
-              className="text-xs px-2 py-0.5 rounded-full"
-              style={{
-                background: r.status === "open" ? "rgba(255,176,122,0.1)" : "rgba(255,255,255,0.05)",
-                color: r.status === "open" ? "#FFB07A" : "rgba(255,255,255,0.25)",
-                fontWeight: 600,
-                fontFamily: "Inter, sans-serif",
-              }}
+
+        {reportsLoading && (
+          <div className="px-5 py-8 text-center text-white/35 text-sm" style={{ fontFamily: "Inter, sans-serif" }}>
+            Загрузка жалоб...
+          </div>
+        )}
+
+        {!reportsLoading && reports.length === 0 && (
+          <div className="px-5 py-10 text-center">
+            <AlertTriangle size={28} className="mx-auto mb-3 text-white/20" />
+            <p className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+              Жалоб пока нет
+            </p>
+          </div>
+        )}
+
+        {!reportsLoading && reports.map((r, i) => {
+          const status = reportStatusConfig[r.status];
+          const canTake = r.status === "open";
+          const canFinish = r.status === "open" || r.status === "in_review";
+
+          return (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: i * 0.06 }}
+              className="flex flex-col gap-3 px-5 py-4 border-b border-white/[0.03] last:border-0"
             >
-              {r.status === "open" ? "Открыта" : "Решена"}
-            </span>
-            {r.status === "open" && (
-              <motion.button
-                className="px-3 py-1 rounded-lg text-xs text-white/60"
-                style={{
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  fontFamily: "Inter, sans-serif",
-                  fontWeight: 600,
-                }}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                Рассмотреть
-              </motion.button>
-            )}
-          </motion.div>
-        ))}
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+                <AlertTriangle size={16} style={{ color: status.color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-white text-sm" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+                        {r.reportedUsername} <span className="text-white/30 font-normal">#{r.id}</span>
+                      </p>
+                      <p className="text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+                        Жалоба от {r.reporterUsername} · {formatReportDate(r.createdAt)}
+                      </p>
+                    </div>
+                    <span
+                      className="w-fit rounded-full px-2.5 py-1 text-xs"
+                      style={{
+                        background: status.bg,
+                        color: status.color,
+                        fontWeight: 700,
+                        fontFamily: "Inter, sans-serif",
+                      }}
+                    >
+                      {status.label}
+                    </span>
+                  </div>
+
+                  <div
+                    className="mt-3 rounded-xl px-4 py-3 text-sm text-white/60"
+                    style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.06)", fontFamily: "Inter, sans-serif" }}
+                  >
+                    {r.reason}
+                  </div>
+
+                  {(r.reviewedByUsername || r.moderatorComment) && (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {r.reviewedByUsername && (
+                        <p className="text-white/35 text-xs" style={{ fontFamily: "Inter, sans-serif" }}>
+                          Рассмотрел: {r.reviewedByUsername}
+                          {r.statusChangedAt ? ` · ${formatReportDate(r.statusChangedAt)}` : ""}
+                        </p>
+                      )}
+
+                      {r.moderatorComment && (
+                        <div
+                          className="rounded-xl px-4 py-3 text-sm text-white/65"
+                          style={{ background: "rgba(180,122,255,0.08)", border: "1px solid rgba(180,122,255,0.16)", fontFamily: "Inter, sans-serif" }}
+                        >
+                          <p className="mb-1 text-xs text-white/35" style={{ fontWeight: 700 }}>
+                            Комментарий модератора
+                          </p>
+                          {r.moderatorComment}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2 lg:w-[220px] lg:justify-end">
+                  {canTake && (
+                    <motion.button
+                      type="button"
+                      disabled={updatingReportId === r.id}
+                      onClick={() => void handleReportStatus(r.id, "in_review")}
+                      className="px-3 py-1 rounded-lg text-xs text-white/70 disabled:opacity-60"
+                      style={{
+                        background: "rgba(180,122,255,0.1)",
+                        border: "1px solid rgba(180,122,255,0.22)",
+                        fontFamily: "Inter, sans-serif",
+                        fontWeight: 700,
+                      }}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                    >
+                      Взять в работу
+                    </motion.button>
+                  )}
+
+                  {canFinish && (
+                    <>
+                      <motion.button
+                        type="button"
+                        disabled={updatingReportId === r.id}
+                        onClick={() => {
+                          setStatusDraftReportId(r.id);
+                          setStatusDraft("resolved");
+                          setModeratorComment(r.moderatorComment ?? "");
+                        }}
+                        className="px-3 py-1 rounded-lg text-xs text-white/70 disabled:opacity-60"
+                        style={{
+                          background: "rgba(74,222,128,0.08)",
+                          border: "1px solid rgba(74,222,128,0.16)",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 700,
+                        }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        Решить
+                      </motion.button>
+
+                      <motion.button
+                        type="button"
+                        disabled={updatingReportId === r.id}
+                        onClick={() => {
+                          setStatusDraftReportId(r.id);
+                          setStatusDraft("rejected");
+                          setModeratorComment(r.moderatorComment ?? "");
+                        }}
+                        className="px-3 py-1 rounded-lg text-xs text-white/70 disabled:opacity-60"
+                        style={{
+                          background: "rgba(255,138,138,0.08)",
+                          border: "1px solid rgba(255,138,138,0.16)",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 700,
+                        }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        Отклонить
+                      </motion.button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {statusDraftReportId === r.id && (
+                <div
+                  className="rounded-xl p-4"
+                  style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.06)" }}
+                >
+                  <p className="mb-2 text-sm text-white" style={{ fontWeight: 700, fontFamily: "Inter, sans-serif" }}>
+                    {statusDraft === "resolved" ? "Завершить жалобу" : "Отклонить жалобу"}
+                  </p>
+                  <textarea
+                    value={moderatorComment}
+                    onChange={(event) => setModeratorComment(event.target.value)}
+                    rows={3}
+                    placeholder="Короткий комментарий для пользователя"
+                    className="w-full rounded-xl px-4 py-3 text-sm text-white outline-none resize-none"
+                    style={{
+                      background: "rgba(8,8,14,0.5)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      fontFamily: "Inter, sans-serif",
+                    }}
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <motion.button
+                      type="button"
+                      disabled={updatingReportId === r.id}
+                      onClick={() => void handleReportStatus(r.id, statusDraft, moderatorComment)}
+                      className="px-4 py-2 rounded-xl text-sm text-white disabled:opacity-60"
+                      style={{
+                        background: statusDraft === "resolved"
+                          ? "rgba(74,222,128,0.14)"
+                          : "rgba(255,138,138,0.14)",
+                        border: statusDraft === "resolved"
+                          ? "1px solid rgba(74,222,128,0.24)"
+                          : "1px solid rgba(255,138,138,0.24)",
+                        fontFamily: "Inter, sans-serif",
+                        fontWeight: 700,
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Сохранить
+                    </motion.button>
+                    <motion.button
+                      type="button"
+                      onClick={() => {
+                        setStatusDraftReportId(null);
+                        setModeratorComment("");
+                      }}
+                      className="px-4 py-2 rounded-xl text-sm text-white/55"
+                      style={{
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        fontFamily: "Inter, sans-serif",
+                        fontWeight: 700,
+                      }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      Отмена
+                    </motion.button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
@@ -2081,6 +2470,7 @@ export default function Dashboard() {
               {activeTab === "overview" && <OverviewTab user={profile} orders={mappedOrders} />}
               {activeTab === "orders" && <OrdersTab orders={mappedOrders} />}
               {activeTab === "reviews" && <MyReviewsTab />}
+              {activeTab === "reports" && <MyReportsTab />}
               {activeTab === "settings" && <SettingsTab user={profile} onUserUpdated={updateUser} />}
               {activeTab === "moderation" && (profile.role === "moderator" || profile.role === "admin") && <ModerationTab />}
               {activeTab === "catalog" && (profile.role === "moderator" || profile.role === "admin") && <ProductManagementTab role={profile.role} />}
