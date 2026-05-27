@@ -29,7 +29,7 @@ const cryptoNetworks = ["TRC20", "ERC20", "BEP20", "TON", "Bitcoin", "Ethereum"]
 
 export function CheckoutPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { items, totalPrice, clearCart } = useCart();
   const [method, setMethod] = useState<PaymentMethod>("card");
   const [cardholder, setCardholder] = useState(user?.username ?? "");
@@ -79,6 +79,7 @@ export function CheckoutPage() {
       return;
     }
 
+    await refreshUser();
     clearCart();
     navigate("/dashboard");
   }
